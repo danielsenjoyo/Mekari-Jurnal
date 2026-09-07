@@ -377,15 +377,15 @@ keyword vs. quick filter vs. genuinely-empty source). No CTA: recovery is via th
 search × (§7) and the clearable quick-filter selects.
 
 ```vue
-<div v-else :class="emptyStateClass">
-  <!-- gap:3, py:16, centered -->
-  <img src="/illustrations/search-not-found.png" alt="" :class="emptyIllustrationClass" />
-  <MpText weight="semiBold" color="dark" :class="emptyTitleClass">{{ emptyTitle }}</MpText>
-  <MpText size="body-small" color="gray.600" :class="emptyDescClass">{{ emptyDescription }}</MpText>
-</div>
+<BlankSlate v-else :variant="emptyVariant" :title="emptyTitle" :description="emptyDescription" />
 ```
 
 ```ts
+// The illustration follows the CAUSE: a list that never had a row is not a
+// failed search (docs/patterns/BlankSlate.md).
+const emptyVariant = computed(() =>
+  searchTerm.value || filterCategory.value || filterStatus.value ? "not-found" : "no-data"
+);
 const emptyTitle = computed(() => {
   if (searchTerm.value) return `"${searchTerm.value}" not found`; // e.g. "Hungry Bear" not found
   if (filterCategory.value || filterStatus.value) return "No results found";
@@ -401,7 +401,7 @@ const emptyDescription = computed(() => {
 
 **Rules**
 
-- **Illustration.** Use the official **Mekari Pixel illustration**, not a flat icon. The "search not found" asset (3D card + magnifier with a red ✕) lives at [`public/illustrations/search-not-found.png`](../public/illustrations/search-not-found.png), sourced from the Pixel patterns repo (`Pixel-Sandbox/pixel3-templates-patterns` → table patterns). Shown at `width: 180px` (`height: auto`) on a decorative `<img alt="">`. Add new blank-slate illustrations under `public/illustrations/`.
+- **Illustration.** Never authored here: [`BlankSlate`](./patterns/BlankSlate.md) renders one of Pixel's own 3D assets from `https://cdn.mekari.design/illustration/blank-slate/`, picked by the `variant` prop. Pixel's empty-state block says outright not to generate new illustrations.
 - **Three cases, one block.** Search keyword → `"<term>" not found` + search-retry copy. Quick filter only → "No results found". Genuinely empty source → "No data yet" (on real screens, swap in a "Create …" primary CTA for the truly-empty case).
 - **No in-slate CTA.** Title: 16px (`lg`) semibold; body: `body-small / gray.600`, capped at `maxWidth: 320px`. The blank slate carries no button — recovery is the search × (§7) and the clearable quick-filter selects.
 - The **filter bar (Zone C) stays mounted** above the blank slate (it's outside the `v-if`), so the user can recover by clearing the search or adjusting the quick filters.
@@ -479,7 +479,7 @@ only touches `pagedRows` ids).
 5. Filter drawer mirroring the filters; Apply closes, Reset clears.
 6. Table: define `columns`, `colWidths` (checkbox 44px + Actions 140px fixed, middle % summing to 100%), the fixed-layout + sticky-actions + 1px-header classes, the overflow `ResizeObserver`, bulk row, skeleton rows.
 7. Pagination footer.
-8. Blank slate as the `v-else` — the `search-not-found` illustration + adaptive copy (`emptyTitle`/`emptyDescription`), no CTA (recovery via the search × and quick filters).
+8. Blank slate as the `v-else` — `<BlankSlate>` with adaptive `emptyVariant`/`emptyTitle`/`emptyDescription`, no CTA (recovery via the search × and quick filters).
 9. Wire the state model (§12); replace the static `rows` with your data source and flip `isLoading` around the fetch.
 10. `pnpm lint` + `nuxt typecheck` clean; verify in the preview.
 
@@ -490,6 +490,7 @@ only touches `pagedRows` ids).
 - **v1.5.0** — Added §9.1a: align all columns left, including money. Right-aligned figures don't line up with a sortable header, because the sort icon pushes the label off the shared edge.
 - **v1.4.0** — Reworked §9.1 column sizing: **per-column px widths** (a `COLUMN_WIDTH` map with a derived `min-width`) replace the even percentage split, which was starving every column to the narrowest one's width and clipping document numbers mid-string; horizontal overflow of `MpTableContainer` is now stated as intended behaviour rather than something to design around. Cell text **wraps instead of clipping**, and the `!`-forced override an `MpTextlink`/`MpButton` cell needs is documented as `display:flex!` + `width:full!` + `justifyContent` (without which a long value renders centred and spilling off _both_ sides). Also documented the Actions column (§9.3) as optional — dropped on the Purchases index page in favour of the record link + bulk bar.
 - **v1.3.0** — Dropped the blank-slate **Clear filters** CTA. Recovery now happens through the **search field's own clear (×) button** (revealed on hover/focus, only with a keyword, `@click="search = ''"` — the library's `is-clearable` is avoided because its svg clear emits `undefined`) and the clearable quick-filter selects. Added a `searchTerm` computed to normalize the search keyword.
-- **v1.2.0** — Zone I now uses the official Mekari **"search not found" 3D illustration** (`public/illustrations/search-not-found.png`, from the Pixel patterns repo) instead of a flat icon, with copy that names the search term (`"<term>" not found`) and three adaptive cases (search / filter / empty) via `emptyTitle` + `emptyDescription` computeds.
+- **v1.3.0** — Zone I moved onto the shared [`BlankSlate`](./patterns/BlankSlate.md) component, which takes its illustration from Pixel's CDN library and picks between the never-had-data and nothing-matched assets by cause.
+- **v1.2.0** — Zone I now uses the official Mekari **"search not found" 3D illustration** (then a local PNG copy) instead of a flat icon, with copy that names the search term (`"<term>" not found`) and three adaptive cases (search / filter / empty) via `emptyTitle` + `emptyDescription` computeds.
 - **v1.1.0** — Upgraded Zone I to the library **blank slate / Empty State** pattern: muted 48px icon, 16px (`lg`) title, capped-width body, and context-aware copy + a **Clear filters** CTA driven by a `hasActiveFilters` computed (no-results vs. genuinely-empty cases).
 - **v1.0.0** — Initial pattern extracted from `index-template.vue`. Documents the zone composition, page-level vs content tabs, SummaryBox variants/slots, MpSelect quick filters, the filter drawer, the fixed-layout table (colgroup, pinned 44px checkbox / 140px Actions, 1px header divider, sticky Actions column with overflow-only divider, bulk-action header, skeleton + empty states), pagination, the state-model contract, styling/token rules, and component gotchas.

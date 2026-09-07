@@ -117,20 +117,20 @@ wrapping element.
 
 ## Pattern index
 
-| Pattern                                           | One-liner                                        |
-| ------------------------------------------------- | ------------------------------------------------ |
-| [`page-title-bar`](./page-title-bar.md)           | Title + action row at the top of every page.     |
-| [`Tabs`](./Tabs.md)                               | Page-level (flush to stage) vs. content tabs.    |
-| [`SummaryBox`](./SummaryBox.md)                   | KPI strip of two-tone summary cards.             |
-| [`FilterBar`](./FilterBar.md)                     | Quick filters + search + Filter button.          |
-| [`Drawer`](./Drawer.md)                           | Right-side panel for the full filter set / form. |
-| [`TablePage`](./TablePage.md)                     | Fixed-layout table, sticky header + Actions.     |
-| [`BulkActionBar`](./BulkActionBar.md)             | Header swap while rows are selected.             |
-| [`Pagination`](./Pagination.md)                   | Rows-per-page + page-jump footer.                |
-| [`StatusBadge`](./StatusBadge.md)                 | Domain status → `MpBadge type`.                  |
-| [`BlankSlate`](./BlankSlate.md)                   | Adaptive search-not-found empty state.           |
-| [`Form`](./Form.md)                               | `MpFormControl`-wrapped fields.                  |
-| [`Modal`](./Modal.md)                             | Centred confirm / focused dialog.                |
-| [`index-page-format`](./index-page-format.md)     | Index-page zone composition.                     |
-| [`details-page-format`](./details-page-format.md) | Details-page zone composition.                   |
-| [`form-page-format`](./form-page-format.md)       | Create/edit form-page zone composition.          |
+| Pattern                                           | One-liner                                                  |
+| ------------------------------------------------- | ---------------------------------------------------------- |
+| [`page-title-bar`](./page-title-bar.md)           | Title + action row at the top of every page.               |
+| [`Tabs`](./Tabs.md)                               | Page-level (flush to stage) vs. content tabs.              |
+| [`SummaryBox`](./SummaryBox.md)                   | KPI strip of two-tone summary cards.                       |
+| [`FilterBar`](./FilterBar.md)                     | Quick filters + search + Filter button.                    |
+| [`Drawer`](./Drawer.md)                           | Right-side panel for the full filter set / form.           |
+| [`TablePage`](./TablePage.md)                     | Fixed-layout table, sticky header + Actions.               |
+| [`BulkActionBar`](./BulkActionBar.md)             | Header swap while rows are selected.                       |
+| [`Pagination`](./Pagination.md)                   | Rows-per-page + page-jump footer.                          |
+| [`StatusBadge`](./StatusBadge.md)                 | Domain status → `MpBadge type`.                            |
+| [`BlankSlate`](./BlankSlate.md)                   | Empty state: empty table, empty section, record not found. |
+| [`Form`](./Form.md)                               | `MpFormControl`-wrapped fields.                            |
+| [`Modal`](./Modal.md)                             | Centred confirm / focused dialog.                          |
+| [`index-page-format`](./index-page-format.md)     | Index-page zone composition.                               |
+| [`details-page-format`](./details-page-format.md) | Details-page zone composition.                             |
+| [`form-page-format`](./form-page-format.md)       | Create/edit form-page zone composition.                    |

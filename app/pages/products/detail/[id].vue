@@ -37,14 +37,13 @@
       </MpTooltip>
     </template>
 
-    <div v-if="!product" :class="notFoundClass">
-      <img src="/illustrations/search-not-found.png" alt="" :class="notFoundIllustrationClass" />
-      <MpText weight="semiBold" color="dark" :class="notFoundTitleClass">Product not found</MpText>
-      <MpText size="body-small" color="gray.600" :class="notFoundDescClass">
-        This product may have been deleted, or the link you followed may be out of date.
-      </MpText>
+    <BlankSlate
+      v-if="!product"
+      title="Product not found"
+      description="This product may have been deleted, or the link you followed may be out of date."
+    >
       <MpButton variant="secondary" @click="navigateTo('/products')">Back to Product list</MpButton>
-    </div>
+    </BlankSlate>
 
     <template v-else>
       <!-- Zone A — identity row. The right column carries the record's one
@@ -695,7 +694,7 @@ const tradeRowClass = css({
 });
 const tradeColClass = css({ display: "flex", flexDirection: "column", gap: 4, minWidth: "0" });
 
-const relatedSectionClass = css({ mt: 10 });
+const relatedSectionClass = css({ mt: 8 });
 const relatedBodyClass = css({ pt: 4 });
 const relatedCaptionClass = css({ display: "block", mb: 3 });
 // `min-width` so a narrow stage scrolls the table (MpTableContainer is the
@@ -730,18 +729,6 @@ const bundleTotalClass = css({
   gap: 3,
   mt: 4
 });
-
-const notFoundClass = css({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 3,
-  py: 16,
-  textAlign: "center"
-});
-const notFoundTitleClass = css({ fontSize: "lg" });
-const notFoundIllustrationClass = css({ width: "180px", height: "auto", mb: 1 });
-const notFoundDescClass = css({ maxWidth: "320px" });
 
 const modalTitleClass = css({ fontSize: "lg" });
 const modalFooterClass = css({ display: "flex", justifyContent: "flex-end", gap: 2 });

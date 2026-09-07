@@ -123,8 +123,19 @@ mekari, qontak, talenta, university.)
 | `--mp-spacing-12`   | `3rem`     | 48px  | Hero / empty-state vertical padding   |
 | `--mp-spacing-16`   | `4rem`     | 64px  | Page-level large gaps                 |
 
-> Note: Pixel does not ship a 40px spacing token. Use `--mp-sizes-10`
-> (`2.5rem`, 40px) when you need that gap, or compose with multiples.
+> **The scale has holes, and missing steps fail silently.** The table above is
+> the whole scale: there is no `7`, `9`, `10`, `11`, `13`, `14` or `15`. Panda
+> still emits the class for one — `css({ mt: 10 })` produces
+> `.mp-mt_10 { margin-top: var(--mp-spacing-10) }` — but the variable is never
+> defined, so the rule resolves to nothing and the element renders with **zero**
+> margin. Nothing warns: not the type checker, not the linter, not the browser.
+>
+> This shipped: twelve call sites across the Products module used `mt: 10` for
+> the gap above a form's commit row or a details page's related-records section,
+> and every one of them had no gap at all until it was found by measuring the
+> DOM. When a step you want isn't in the table, round to one that is (`8` = 32px,
+> `12` = 48px) rather than assuming the number exists — or, for a genuine 40px,
+> use `--mp-sizes-10` (`2.5rem`).
 
 ---
 

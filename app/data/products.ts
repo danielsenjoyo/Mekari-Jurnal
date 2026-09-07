@@ -218,6 +218,55 @@ export const PRICE_RULE_TYPE_OPTIONS = Object.keys(PRICE_RULE_TYPE_LABEL) as Pri
 // Entities
 // ---------------------------------------------------------------------------
 
+/**
+ * The product form's "Product type" select — the first branch a user makes on
+ * that screen, and the one that decides whether the Bundle components table
+ * exists at all.
+ *
+ * Kept separate from `ProductType` above (Inventory / Non-inventory / Service),
+ * which is a *catalogue* classification the list and filter drawer read. The
+ * form asks this question instead, so the two vocabularies must not be merged:
+ * a bundle can be an inventory item, and a single can be a service.
+ */
+export type ProductKind = "single" | "bundle";
+
+export const PRODUCT_KIND_LABEL: Record<ProductKind, string> = {
+  single: "Single",
+  bundle: "Bundle"
+};
+
+/** Shown under each option in the form's Product type dropdown — the choice is
+ *  not self-explanatory from two one-word labels, which is why the source
+ *  renders a description line with each. */
+export const PRODUCT_KIND_DESCRIPTION: Record<ProductKind, string> = {
+  single:
+    "Goods or services that are traded as a unit without addition. Example: Laptop, water bottle, logo design, etc.",
+  bundle:
+    "Goods or services that are traded as a package. Example: Food and beverage package, salon services (haircut and bubble bath), etc."
+};
+
+export const PRODUCT_KIND_OPTIONS = Object.keys(PRODUCT_KIND_LABEL) as ProductKind[];
+
+/**
+ * The Track / Untrack pair at the top of the form's Inventory tracking group,
+ * and what each one says it will do. The wording differs per product kind: a
+ * bundle's stock figure is the bundle's own quantity *plus* its components',
+ * so saying "product qty" there would understate what tracking covers.
+ */
+export const INVENTORY_TRACKING_MODE_DESCRIPTION: Record<
+  ProductKind,
+  { track: string; untrack: string }
+> = {
+  single: {
+    track: "System will record inventory value & product qty for all tracking types",
+    untrack: "System will not record inventory value & product qty"
+  },
+  bundle: {
+    track: "System will record inventory value & product bundle qty along with its components",
+    untrack: "System will not record inventory value & product bundle qty"
+  }
+};
+
 /** Source: the product form's "Inventory tracking" radio group
  *  (`form/i18n.json → tracking_type`). Batch and serial each unlock their own
  *  tab on the detail page; only batch has a detail page of its own here. */
@@ -273,10 +322,22 @@ export interface Product {
   isSell: boolean;
   sellAccount: string;
   sellTax: string;
+  /** Where a discount given on a sale of this product is posted. Empty when the
+   *  product isn't sold. Masters carry the same field. */
+  sellDiscountAccount: string;
+  /** File name of the product image. The prototype has no upload backend, so
+   *  the form keeps the chosen file's name and nothing else — enough for the
+   *  form to show what was picked, not enough to render a thumbnail, which is
+   *  why no screen displays it yet. */
+  imageName: string;
   /** Set when this product is a variant of a ProductMaster. */
   masterId: number | null;
   /** Populated only when `isBundle`. */
   bundleItems: BundleItem[];
+  /** Where the cost of assembling a bundle beyond its components is posted —
+   *  the form's "Additional expense account for bundle components". Empty for a
+   *  single product. */
+  bundleExpenseAccount: string;
   /** Stock on hand. `null` for a product whose stock isn't tracked (services,
    *  and inventory items with "Track stock" unchecked) — the source renders
    *  those cells empty rather than as a zero, and a zero would read as
@@ -319,6 +380,27 @@ export interface ProductVariant {
   sellPrice: number;
 }
 
+/**
+ * One row of the master form's variant table.
+ *
+ * The rows themselves are never authored: they are the cartesian product of the
+ * attributes (see `seedMaster`). What a user fills in per row is only this —
+ * identified by the option values, because that is the one thing about a row
+ * that survives an attribute being edited.
+ */
+export interface VariantInput {
+  options: string[];
+  code: string;
+  barcode: string;
+  buyPrice: number;
+  sellPrice: number;
+}
+
+/** The identity of a variant row: its option values in attribute order. */
+export function variantKey(options: string[]): string {
+  return options.join(" / ");
+}
+
 /** A variant-defining attribute and its options — "Size: S, M, L, XL". The
  *  source caps a master at two attributes. */
 export interface VariantAttribute {
@@ -336,7 +418,11 @@ export interface ProductMaster {
   id: number;
   name: string;
   description: string;
+  /** Generated, not entered: the master form asks for per-variant SKUs, so the
+   *  stem those fall back to is derived from the id. */
   code: string;
+  /** File name of the main product image — see `Product.imageName`. */
+  imageName: string;
   category: string;
   unit: string;
   /** How many variants sit under this master (Size × Colour, …). Derived from
@@ -380,6 +466,12 @@ export interface StockAdjustmentLine {
   actual: number;
   /** Costing price at the time, for valuing the difference. */
   avgPrice: number;
+  /**
+   * Where in the warehouse the difference lands — set through the line's "Set
+   * location" / "Pick from location" drawer, and only when the storage-location
+   * feature is on. Absent means the warehouse is one undivided space.
+   */
+  locations?: LocationAllocation[];
 }
 
 export function adjustmentDifference(line: StockAdjustmentLine): number {
@@ -432,31 +524,62 @@ export interface ProductApproval {
   lines: StockAdjustmentLine[];
 }
 
+/**
+ * One level of a warehouse's multilevel storage, broadest first: Area → Rack →
+ * Bin. The *names* are the tenant's own, which is why `type` is a free string
+ * with suggestions rather than an enum — the form's picker is "select or enter
+ * to add".
+ */
+export interface StorageLevel {
+  /** What this level is called here: Area, Zone, Row, Rack, Shelf, Bin, … */
+  type: string;
+  /** Whether stock may be put away AT this level, rather than only in the
+   *  finer levels under it. A warehouse can allow several. */
+  isStoringPreference: boolean;
+}
+
+/** The form caps this, as the source does. */
+export const MAX_WAREHOUSE_PICS = 5;
+
 export interface Warehouse {
   id: number;
   code: string;
   name: string;
   address: string;
-  /** Person in charge. */
-  pic: string;
+  /** People in charge — up to `MAX_WAREHOUSE_PICS`. Each of them is who gets
+   *  the low-stock and expiring-batch reminders for this warehouse. */
+  pics: string[];
   description: string;
+  /** Empty for a warehouse that stores everything on one undivided floor. */
+  storageLevels: StorageLevel[];
   isActive: boolean;
 }
 
 /**
- * A shelf, rack or bin inside a warehouse — the source's "multilevel storage".
+ * A place inside a warehouse — the source's "multilevel storage".
  *
- * Kept deliberately flat: the source models levels as a configurable hierarchy
- * (row / rack / bin, named per warehouse), and its detail page has a whole tab
- * for defining those level names before any location can be created. That is a
- * settings feature; what the screens here need is the list of locations and
- * which warehouse each belongs to.
+ * Locations nest: an Area contains Racks, a Rack contains Bins. How deep that
+ * goes and what each depth is called is the warehouse's own configuration
+ * (`Warehouse.storageLevels`), which is why a location carries no type of its
+ * own beyond the level it sits at.
  */
 export interface StorageLocation {
   id: number;
   warehouseId: number;
+  /** The location this one sits inside, or null when it sits directly in the
+   *  warehouse. A parent is always in the same warehouse. */
+  parentId: number | null;
+  /** 1-based depth, and an index into the warehouse's `storageLevels`. */
+  level: number;
   code: string;
   name: string;
+}
+
+/** What the warehouse calls the given depth — "Area", "Rack", "Bin". Empty
+ *  when the warehouse hasn't defined a level that deep, which is what stops a
+ *  location being nested further than its warehouse is configured for. */
+export function storageLevelTypeAt(warehouse: Warehouse | undefined, level: number): string {
+  return warehouse?.storageLevels[level - 1]?.type ?? "";
 }
 
 /** One product on a warehouse transfer. `quantity` is what moves;
@@ -468,6 +591,16 @@ export interface TransferLine {
   unit: string;
   quantity: number;
   quantityAtSource: number;
+  /** What the destination already holds. A product's stock lives in one
+   *  warehouse in this prototype (`Product.warehouse`), so this is zero unless
+   *  the product is already kept there — which is exactly the case where a
+   *  transfer tops up an existing pile rather than starting one. */
+  quantityAtDestination: number;
+  /** A transfer touches locations at both ends: stock is picked from named
+   *  locations in the source warehouse and put away into named locations in the
+   *  destination. Each list must add up to `quantity`. */
+  pickLocations?: LocationAllocation[];
+  storeLocations?: LocationAllocation[];
 }
 
 export interface WarehouseTransfer {
@@ -477,6 +610,9 @@ export interface WarehouseTransfer {
   fromWarehouse: string;
   toWarehouse: string;
   memo: string;
+  /** File names only — the prototype has no upload backend (see
+   *  `Product.imageName` for the same trade). */
+  attachments: string[];
   lines: TransferLine[];
 }
 
@@ -541,6 +677,18 @@ export const CONTACT_OPTIONS = [
   "PT Bina Usaha"
 ];
 
+/**
+ * Contact groups, as the source's "Add contact" drawer offers them on its Group
+ * tab. A price rule is stored against individual contacts, so a group is a
+ * shortcut for picking its members — not a third kind of scope that would have
+ * to be resolved again every time the rule is read.
+ */
+export const CONTACT_GROUP_OPTIONS: { name: string; members: string[] }[] = [
+  { name: "Reseller", members: ["PT Sumber Rejeki", "CV Maju Bersama", "Toko Aneka Jaya"] },
+  { name: "Distributor", members: ["PT Karya Mandiri", "PT Bina Usaha"] },
+  { name: "Retail", members: ["Toko Aneka Jaya", "UD Sinar Terang"] }
+];
+
 export interface PriceRule {
   id: number;
   name: string;
@@ -596,8 +744,11 @@ const PRODUCT_DEFAULTS = {
   isSell: true,
   sellAccount: "Sales Revenue",
   sellTax: "PPN 11%",
+  sellDiscountAccount: "",
+  imageName: "",
   masterId: null as number | null,
-  bundleItems: [] as BundleItem[]
+  bundleItems: [] as BundleItem[],
+  bundleExpenseAccount: ""
 };
 
 /** Created dates are spread deterministically backwards from the anchor date so
@@ -1087,7 +1238,12 @@ type ProductMasterSeed = Omit<
   ProductMaster,
   keyof typeof MASTER_DEFAULTS | "createdDate" | "variantCount" | "variants"
 > &
-  Partial<Pick<ProductMaster, keyof typeof MASTER_DEFAULTS | "createdDate">>;
+  Partial<Pick<ProductMaster, keyof typeof MASTER_DEFAULTS | "createdDate">> & {
+    /** What the form's variant table holds for each row, keyed by
+     *  `variantKey(options)`. The mock catalogue below sets none of these and
+     *  derives every variant from the master instead. */
+    variantOverrides?: Record<string, VariantInput>;
+  };
 
 const MASTER_DEFAULTS = {
   trackInventory: true,
@@ -1099,7 +1255,8 @@ const MASTER_DEFAULTS = {
   isSell: true,
   sellAccount: "Sales Revenue",
   sellTax: "PPN 11%",
-  sellDiscountAccount: ""
+  sellDiscountAccount: "",
+  imageName: ""
 };
 
 /** Every combination of the attributes' options, in attribute order — ["S","Hitam"],
@@ -1112,6 +1269,9 @@ function optionCombinations(attributes: VariantAttribute[]): string[][] {
 }
 
 function seedMaster(seed: ProductMasterSeed): ProductMaster {
+  // Pulled out of the spread below so it never lands on the stored record: it
+  // is form state, and the variants it produced are what get kept.
+  const { variantOverrides, ...rest } = seed;
   const combinations = optionCombinations(seed.attributes);
   // Spread the master's total stock across its variants, remainder on the
   // first — so the variant rows always add up to the total shown above them.
@@ -1120,24 +1280,30 @@ function seedMaster(seed: ProductMasterSeed): ProductMaster {
 
   const variants: ProductVariant[] = combinations.map((options, index) => {
     const quantity = per + (index === 0 ? remainder : 0);
+    // What the user typed for this row wins; anything left blank falls back to
+    // a value derived from the master, so a half-filled table still produces
+    // variants that can be told apart.
+    const entered = variantOverrides?.[variantKey(options)];
     return {
       id: seed.id * 100 + index + 1,
       name: `${seed.name} - ${options.join(" / ")}`,
       options,
-      code: `${seed.code}-${String(index + 1).padStart(2, "0")}`,
-      barcode: `899${seed.code.replace(/\D/g, "")}${String(index + 1).padStart(4, "0")}`,
+      code: entered?.code.trim() || `${seed.code}-${String(index + 1).padStart(2, "0")}`,
+      barcode:
+        entered?.barcode.trim() ||
+        `899${seed.code.replace(/\D/g, "")}${String(index + 1).padStart(4, "0")}`,
       quantity,
       // A slice of each variant's stock is committed to open fulfilments.
       quantityAvailable: Math.max(0, quantity - (index % 3) * 2),
       buffer: seed.quantity > 0 ? 10 : 0,
-      buyPrice: seed.buyPrice,
-      sellPrice: seed.sellPrice
+      buyPrice: entered?.buyPrice ?? seed.buyPrice,
+      sellPrice: entered?.sellPrice ?? seed.sellPrice
     };
   });
 
   return {
     ...MASTER_DEFAULTS,
-    ...seed,
+    ...rest,
     createdDate: seed.createdDate ?? dateAt(-380 + (seed.id - 100) * 21),
     variantCount: variants.length,
     variants
@@ -1297,7 +1463,8 @@ function transferLinesFor(recordId: number): TransferLine[] {
       unit: product.unit,
       // A transfer moves a slice of what the source holds, never more.
       quantity: Math.max(1, Math.round(atSource * 0.15)),
-      quantityAtSource: atSource
+      quantityAtSource: atSource,
+      quantityAtDestination: 0
     };
   });
 }
@@ -1320,9 +1487,10 @@ function seedApproval(seed: ProductApprovalSeed): ProductApproval {
   };
 }
 
-type WarehouseTransferSeed = Omit<WarehouseTransfer, "lines">;
+// The mock transfers carry no attachments, so the seeds don't write the field.
+type WarehouseTransferSeed = Omit<WarehouseTransfer, "lines" | "attachments">;
 function seedTransfer(seed: WarehouseTransferSeed): WarehouseTransfer {
-  return { ...seed, lines: transferLinesFor(seed.id) };
+  return { ...seed, attachments: [], lines: transferLinesFor(seed.id) };
 }
 
 const STOCK_ADJUSTMENT_SEEDS: StockAdjustmentSeed[] = [
@@ -1331,7 +1499,7 @@ const STOCK_ADJUSTMENT_SEEDS: StockAdjustmentSeed[] = [
     date: dateAt(-1),
     number: "ADJ/2026/09/0014",
     adjustmentType: "stock_count",
-    category: "Stock opname",
+    category: "General",
     account: "Inventory Adjustment",
     warehouse: "Main Warehouse",
     memo: "Opname bulanan gudang utama",
@@ -1342,7 +1510,7 @@ const STOCK_ADJUSTMENT_SEEDS: StockAdjustmentSeed[] = [
     date: dateAt(-3),
     number: "ADJ/2026/08/0013",
     adjustmentType: "in_out",
-    category: "Damaged goods",
+    category: "Waste",
     account: "Cost of Goods Sold",
     warehouse: "Secondary Warehouse",
     memo: "Kardus basah karena bocor atap",
@@ -1353,7 +1521,7 @@ const STOCK_ADJUSTMENT_SEEDS: StockAdjustmentSeed[] = [
     date: dateAt(-6),
     number: "ADJ/2026/08/0012",
     adjustmentType: "in_out",
-    category: "Sample & promotion",
+    category: "Waste",
     account: "Marketing Expense",
     warehouse: "Surabaya Hub",
     memo: "Sampel pameran furnitur",
@@ -1364,7 +1532,7 @@ const STOCK_ADJUSTMENT_SEEDS: StockAdjustmentSeed[] = [
     date: dateAt(-9),
     number: "ADJ/2026/08/0011",
     adjustmentType: "stock_count",
-    category: "Stock opname",
+    category: "General",
     account: "Inventory Adjustment",
     warehouse: "Bandung Depot",
     memo: "",
@@ -1375,7 +1543,7 @@ const STOCK_ADJUSTMENT_SEEDS: StockAdjustmentSeed[] = [
     date: dateAt(-12),
     number: "ADJ/2026/08/0010",
     adjustmentType: "in_out",
-    category: "Production usage",
+    category: "Production",
     account: "Work in Process",
     warehouse: "Bandung Depot",
     memo: "Pemakaian resin batch #48",
@@ -1386,7 +1554,7 @@ const STOCK_ADJUSTMENT_SEEDS: StockAdjustmentSeed[] = [
     date: dateAt(-15),
     number: "ADJ/2026/08/0009",
     adjustmentType: "in_out",
-    category: "Damaged goods",
+    category: "Waste",
     account: "Cost of Goods Sold",
     warehouse: "Main Warehouse",
     memo: "",
@@ -1397,7 +1565,7 @@ const STOCK_ADJUSTMENT_SEEDS: StockAdjustmentSeed[] = [
     date: dateAt(-19),
     number: "ADJ/2026/08/0008",
     adjustmentType: "stock_count",
-    category: "Stock opname",
+    category: "General",
     account: "Inventory Adjustment",
     warehouse: "Secondary Warehouse",
     memo: "Opname triwulan",
@@ -1408,7 +1576,7 @@ const STOCK_ADJUSTMENT_SEEDS: StockAdjustmentSeed[] = [
     date: dateAt(-23),
     number: "ADJ/2026/08/0007",
     adjustmentType: "in_out",
-    category: "Return to vendor",
+    category: "General",
     account: "Inventory Adjustment",
     warehouse: "Bandung Depot",
     memo: "Bearing tidak sesuai spesifikasi",
@@ -1419,7 +1587,7 @@ const STOCK_ADJUSTMENT_SEEDS: StockAdjustmentSeed[] = [
     date: dateAt(-27),
     number: "ADJ/2026/08/0006",
     adjustmentType: "in_out",
-    category: "Sample & promotion",
+    category: "Waste",
     account: "Marketing Expense",
     warehouse: "Surabaya Hub",
     memo: "",
@@ -1430,7 +1598,7 @@ const STOCK_ADJUSTMENT_SEEDS: StockAdjustmentSeed[] = [
     date: dateAt(-31),
     number: "ADJ/2026/08/0005",
     adjustmentType: "stock_count",
-    category: "Stock opname",
+    category: "General",
     account: "Inventory Adjustment",
     warehouse: "Main Warehouse",
     memo: "Opname bulanan",
@@ -1441,7 +1609,7 @@ const STOCK_ADJUSTMENT_SEEDS: StockAdjustmentSeed[] = [
     date: dateAt(-35),
     number: "ADJ/2026/07/0004",
     adjustmentType: "in_out",
-    category: "Production usage",
+    category: "Production",
     account: "Work in Process",
     warehouse: "Bandung Depot",
     memo: "Pigmen batch #47",
@@ -1452,7 +1620,7 @@ const STOCK_ADJUSTMENT_SEEDS: StockAdjustmentSeed[] = [
     date: dateAt(-40),
     number: "ADJ/2026/07/0003",
     adjustmentType: "in_out",
-    category: "Damaged goods",
+    category: "Waste",
     account: "Cost of Goods Sold",
     warehouse: "Surabaya Hub",
     memo: "Kursi rusak saat bongkar muat",
@@ -1463,7 +1631,7 @@ const STOCK_ADJUSTMENT_SEEDS: StockAdjustmentSeed[] = [
     date: dateAt(-46),
     number: "ADJ/2026/07/0002",
     adjustmentType: "stock_count",
-    category: "Stock opname",
+    category: "General",
     account: "Inventory Adjustment",
     warehouse: "Surabaya Hub",
     memo: "",
@@ -1474,7 +1642,7 @@ const STOCK_ADJUSTMENT_SEEDS: StockAdjustmentSeed[] = [
     date: dateAt(-52),
     number: "ADJ/2026/07/0001",
     adjustmentType: "in_out",
-    category: "Return to vendor",
+    category: "General",
     account: "Inventory Adjustment",
     warehouse: "Main Warehouse",
     memo: "",
@@ -1490,7 +1658,7 @@ const PRODUCT_APPROVAL_SEEDS: ProductApprovalSeed[] = [
     date: dateAt(0),
     number: "ADJ/2026/09/0016",
     transactionType: "stock_count",
-    category: "Stock opname",
+    category: "General",
     account: "Inventory Adjustment",
     warehouse: "Main Warehouse",
     memo: "Opname mendadak, selisih 42 rim",
@@ -1501,7 +1669,7 @@ const PRODUCT_APPROVAL_SEEDS: ProductApprovalSeed[] = [
     date: dateAt(0),
     number: "ADJ/2026/09/0015",
     transactionType: "in_out",
-    category: "Damaged goods",
+    category: "Waste",
     account: "Cost of Goods Sold",
     warehouse: "Secondary Warehouse",
     memo: "",
@@ -1534,7 +1702,7 @@ const PRODUCT_APPROVAL_SEEDS: ProductApprovalSeed[] = [
     date: dateAt(-5),
     number: "ADJ/2026/08/0017",
     transactionType: "in_out",
-    category: "Sample & promotion",
+    category: "Waste",
     account: "Marketing Expense",
     warehouse: "Surabaya Hub",
     memo: "Sampel untuk klien korporat",
@@ -1550,7 +1718,12 @@ const WAREHOUSES: Warehouse[] = [
     code: "WH-001",
     name: "Main Warehouse",
     address: "Jl. Raya Bekasi KM 21, Jakarta Timur",
-    pic: "Budi Santoso",
+    pics: ["Budi Santoso"],
+    storageLevels: [
+      { type: "Rack", isStoringPreference: false },
+      { type: "Row", isStoringPreference: false },
+      { type: "Bin", isStoringPreference: true }
+    ],
     description: "Gudang pusat, semua kategori",
     isActive: true
   },
@@ -1559,7 +1732,8 @@ const WAREHOUSES: Warehouse[] = [
     code: "WH-002",
     name: "Secondary Warehouse",
     address: "Kawasan Industri Pulogadung Blok C7, Jakarta Timur",
-    pic: "Rina Wulandari",
+    pics: ["Rina Wulandari"],
+    storageLevels: [{ type: "Area", isStoringPreference: true }],
     description: "Packaging dan barang habis pakai",
     isActive: true
   },
@@ -1568,7 +1742,8 @@ const WAREHOUSES: Warehouse[] = [
     code: "WH-003",
     name: "Bandung Depot",
     address: "Jl. Soekarno Hatta No. 412, Bandung",
-    pic: "Agus Prasetyo",
+    pics: ["Agus Prasetyo"],
+    storageLevels: [{ type: "Rack", isStoringPreference: true }],
     description: "Bahan baku dan spare part",
     isActive: true
   },
@@ -1577,7 +1752,8 @@ const WAREHOUSES: Warehouse[] = [
     code: "WH-004",
     name: "Surabaya Hub",
     address: "Jl. Rungkut Industri III No. 18, Surabaya",
-    pic: "Dewi Lestari",
+    pics: ["Dewi Lestari"],
+    storageLevels: [{ type: "Area", isStoringPreference: true }],
     description: "Distribusi Jawa Timur",
     isActive: true
   },
@@ -1586,7 +1762,8 @@ const WAREHOUSES: Warehouse[] = [
     code: "WH-005",
     name: "Semarang Transit",
     address: "Jl. Kaligawe Raya KM 5, Semarang",
-    pic: "Fajar Nugroho",
+    pics: ["Fajar Nugroho"],
+    storageLevels: [],
     description: "Transit antar hub",
     isActive: true
   },
@@ -1595,7 +1772,8 @@ const WAREHOUSES: Warehouse[] = [
     code: "WH-006",
     name: "Medan Depot",
     address: "Jl. Gatot Subroto No. 220, Medan",
-    pic: "Sari Handayani",
+    pics: ["Sari Handayani"],
+    storageLevels: [],
     description: "Belum beroperasi",
     isActive: false
   },
@@ -1604,7 +1782,8 @@ const WAREHOUSES: Warehouse[] = [
     code: "WH-007",
     name: "Gudang Retur",
     address: "Jl. Raya Bekasi KM 21 (Blok B), Jakarta Timur",
-    pic: "Budi Santoso",
+    pics: ["Budi Santoso"],
+    storageLevels: [],
     description: "Ditutup, digabung ke gudang pusat",
     isActive: false
   }
@@ -1874,6 +2053,13 @@ export function getWarehouses(): Warehouse[] {
   return [...WAREHOUSES];
 }
 
+/** Movements name their warehouse rather than pointing at its id (that is how
+ *  the source's records read), so the location screens have to find it back by
+ *  name to know which locations it has. */
+export function getWarehouseByName(name: string): Warehouse | undefined {
+  return WAREHOUSES.find((warehouse) => warehouse.name === name);
+}
+
 export function getWarehouseTransfers(): WarehouseTransfer[] {
   return [...WAREHOUSE_TRANSFERS];
 }
@@ -1886,10 +2072,16 @@ export function getPriceRules(): PriceRule[] {
   return [...PRICE_RULES];
 }
 
-/** Distinct adjustment categories, for the stock-adjustment filter drawer. */
-export const ADJUSTMENT_CATEGORY_OPTIONS = [
-  ...new Set(STOCK_ADJUSTMENTS.map((a) => a.category))
-].sort();
+/**
+ * What an adjustment is *for*. Declared rather than derived from the records
+ * below, because the form offers it: a vocabulary read back out of existing
+ * data can only ever offer what someone has already used, so the first
+ * "Opening quantity" could never be recorded.
+ *
+ * Order is the source's, not alphabetical — General first because it is the
+ * default and by far the common case.
+ */
+export const ADJUSTMENT_CATEGORY_OPTIONS = ["General", "Waste", "Production", "Opening Quantity"];
 
 // ---------------------------------------------------------------------------
 // Mutations. The arrays above are plain (non-reactive) module state, so a page
@@ -2121,8 +2313,10 @@ export interface ProductInput {
   category: string;
   type: ProductType;
   unit: string;
+  imageName: string;
   isBundle: boolean;
   bundleItems: BundleItem[];
+  bundleExpenseAccount: string;
   trackInventory: boolean;
   inventoryTracking: InventoryTracking;
   inventoryAccount: string;
@@ -2139,6 +2333,7 @@ export interface ProductInput {
   sellPrice: number;
   sellAccount: string;
   sellTax: string;
+  sellDiscountAccount: string;
   tags: string[];
 }
 
@@ -2153,11 +2348,16 @@ export function emptyProductInput(): ProductInput {
     category: "",
     type: "inventory",
     unit: "",
+    imageName: "",
     isBundle: false,
     bundleItems: [],
-    trackInventory: true,
+    bundleExpenseAccount: "",
+    // Both of the form's opening branches start unanswered: Product type and
+    // Inventory tracking are required choices, and defaulting either one would
+    // let a product be saved on a decision nobody made.
+    trackInventory: false,
     inventoryTracking: "qty",
-    inventoryAccount: "Inventory",
+    inventoryAccount: INVENTORY_ACCOUNT_OPTIONS[0] ?? "",
     buffer: null,
     warehouse: WAREHOUSE_OPTIONS[0] ?? "",
     isBuy: true,
@@ -2168,6 +2368,7 @@ export function emptyProductInput(): ProductInput {
     sellPrice: 0,
     sellAccount: "Sales Revenue",
     sellTax: "",
+    sellDiscountAccount: "",
     tags: []
   };
 }
@@ -2182,8 +2383,10 @@ export function productToInput(product: Product): ProductInput {
     category: product.category,
     type: product.type,
     unit: product.unit,
+    imageName: product.imageName,
     isBundle: product.isBundle,
     bundleItems: product.bundleItems.map((item) => ({ ...item })),
+    bundleExpenseAccount: product.bundleExpenseAccount,
     trackInventory: product.trackInventory,
     inventoryTracking: product.inventoryTracking,
     inventoryAccount: product.inventoryAccount,
@@ -2197,6 +2400,7 @@ export function productToInput(product: Product): ProductInput {
     sellPrice: product.sellPrice,
     sellAccount: product.sellAccount,
     sellTax: product.sellTax,
+    sellDiscountAccount: product.sellDiscountAccount,
     tags: [...product.tags]
   };
 }
@@ -2213,8 +2417,10 @@ function applyProductInput(target: Product, input: ProductInput): Product {
   target.category = input.category;
   target.type = input.type;
   target.unit = input.unit;
+  target.imageName = input.imageName.trim();
   target.isBundle = input.isBundle;
   target.bundleItems = input.isBundle ? input.bundleItems.map((item) => ({ ...item })) : [];
+  target.bundleExpenseAccount = input.isBundle ? input.bundleExpenseAccount : "";
   target.trackInventory = tracked;
   // A bundle can only ever be tracked by quantity — the source says so outright
   // (`tracking_type.tooltip.product-bundle`).
@@ -2230,6 +2436,7 @@ function applyProductInput(target: Product, input: ProductInput): Product {
   target.sellPrice = input.isSell ? input.sellPrice : 0;
   target.sellAccount = input.isSell ? input.sellAccount : "";
   target.sellTax = input.isSell ? input.sellTax : "";
+  target.sellDiscountAccount = input.isSell ? input.sellDiscountAccount : "";
   target.tags = [...input.tags];
   return target;
 }
@@ -2290,19 +2497,21 @@ export function todayIsoDate(): string {
 export interface ProductMasterInput {
   name: string;
   description: string;
-  code: string;
   category: string;
   unit: string;
+  imageName: string;
   attributes: VariantAttribute[];
+  /** Per-row values from the variant table. Prices live here and nowhere else:
+   *  the form has no master-level price field, so the master's own headline
+   *  figures are derived from these (see `applyMasterInput`). */
+  variants: VariantInput[];
   trackInventory: boolean;
   inventoryTracking: InventoryTracking;
   inventoryAccount: string;
   isBuy: boolean;
-  buyPrice: number;
   buyAccount: string;
   buyTax: string;
   isSell: boolean;
-  sellPrice: number;
   sellAccount: string;
   sellTax: string;
   sellDiscountAccount: string;
@@ -2315,19 +2524,20 @@ export function emptyProductMasterInput(): ProductMasterInput {
   return {
     name: "",
     description: "",
-    code: "",
     category: "",
     unit: "",
+    imageName: "",
     attributes: [{ name: "", options: [] }],
-    trackInventory: true,
+    variants: [],
+    // The form asks this as a plain checkbox, unticked: a master with no stock
+    // tracking is the ordinary case for made-to-order goods.
+    trackInventory: false,
     inventoryTracking: "qty",
-    inventoryAccount: "Inventory",
+    inventoryAccount: INVENTORY_ACCOUNT_OPTIONS[0] ?? "",
     isBuy: true,
-    buyPrice: 0,
     buyAccount: "Purchases",
     buyTax: "",
     isSell: true,
-    sellPrice: 0,
     sellAccount: "Sales Revenue",
     sellTax: "",
     sellDiscountAccount: "",
@@ -2339,22 +2549,27 @@ export function productMasterToInput(master: ProductMaster): ProductMasterInput 
   return {
     name: master.name,
     description: master.description,
-    code: master.code,
     category: master.category,
     unit: master.unit,
+    imageName: master.imageName,
     attributes: master.attributes.map((attribute) => ({
       name: attribute.name,
       options: [...attribute.options]
+    })),
+    variants: master.variants.map((variant) => ({
+      options: [...variant.options],
+      code: variant.code,
+      barcode: variant.barcode,
+      buyPrice: variant.buyPrice,
+      sellPrice: variant.sellPrice
     })),
     trackInventory: master.trackInventory,
     inventoryTracking: master.inventoryTracking,
     inventoryAccount: master.inventoryAccount,
     isBuy: master.isBuy,
-    buyPrice: master.buyPrice,
     buyAccount: master.buyAccount,
     buyTax: master.buyTax,
     isSell: master.isSell,
-    sellPrice: master.sellPrice,
     sellAccount: master.sellAccount,
     sellTax: master.sellTax,
     sellDiscountAccount: master.sellDiscountAccount,
@@ -2378,16 +2593,24 @@ export function variantCountFor(attributes: VariantAttribute[]): number {
 }
 
 function applyMasterInput(seed: ProductMasterSeed, input: ProductMasterInput): ProductMasterSeed {
+  const rows = input.variants;
+  // The list and detail screens still show one headline price per master, and
+  // the form no longer has a field for it — so it is the first variant's, which
+  // is the row a reader sees at the top of the table.
+  const headline = rows[0];
   return {
     ...seed,
     name: input.name.trim(),
     description: input.description.trim(),
-    code: input.code.trim(),
     category: input.category,
     unit: input.unit,
+    imageName: input.imageName.trim(),
     attributes: usableAttributes(input.attributes),
-    buyPrice: input.isBuy ? input.buyPrice : 0,
-    sellPrice: input.isSell ? input.sellPrice : 0,
+    variantOverrides: Object.fromEntries(
+      rows.map((row) => [variantKey(row.options), { ...row, options: [...row.options] }])
+    ),
+    buyPrice: input.isBuy ? (headline?.buyPrice ?? 0) : 0,
+    sellPrice: input.isSell ? (headline?.sellPrice ?? 0) : 0,
     trackInventory: input.trackInventory,
     inventoryTracking: input.inventoryTracking,
     inventoryAccount: input.trackInventory ? input.inventoryAccount : "",
@@ -2403,13 +2626,17 @@ function applyMasterInput(seed: ProductMasterSeed, input: ProductMasterInput): P
 }
 
 export function createProductMaster(input: ProductMasterInput): ProductMaster {
+  const id = nextMasterId++;
   const master = seedMaster(
     applyMasterInput(
       {
-        id: nextMasterId++,
+        id,
         name: "",
         description: "",
-        code: "",
+        // Not asked for on the form: it is only the stem a variant's own SKU
+        // falls back to when its row is left blank.
+        code: `MST-${String(id).padStart(4, "0")}`,
+        imageName: "",
         category: "",
         unit: "",
         quantity: 0,
@@ -2445,6 +2672,7 @@ export function updateProductMaster(
         name: existing.name,
         description: existing.description,
         code: existing.code,
+        imageName: existing.imageName,
         category: existing.category,
         unit: existing.unit,
         quantity: existing.quantity,
@@ -2545,14 +2773,20 @@ export function updatePriceRule(id: number, input: PriceRuleInput): PriceRule | 
 // Storage locations
 // ---------------------------------------------------------------------------
 
+// Main Warehouse is three levels deep, so its seeds nest: Rak A (level 1)
+// holds two rows, and the rows hold bins. The rest are one level.
+// Codes follow the same derivation the form uses (`nextStorageLocationCode`):
+// a location's code is its parent's plus its own position, so the code reads
+// as the path down to it.
 const STORAGE_LOCATIONS: StorageLocation[] = [
-  { id: 4101, warehouseId: 401, code: "A-01-01", name: "Rak A / Baris 1 / Bin 1" },
-  { id: 4102, warehouseId: 401, code: "A-01-02", name: "Rak A / Baris 1 / Bin 2" },
-  { id: 4103, warehouseId: 401, code: "A-02-01", name: "Rak A / Baris 2 / Bin 1" },
-  { id: 4104, warehouseId: 402, code: "PK-01", name: "Area Packing 1" },
-  { id: 4105, warehouseId: 402, code: "PK-02", name: "Area Packing 2" },
-  { id: 4106, warehouseId: 403, code: "BB-01", name: "Rak Bahan Baku 1" },
-  { id: 4107, warehouseId: 404, code: "SBY-01", name: "Blok Distribusi A" }
+  { id: 4100, warehouseId: 401, parentId: null, level: 1, code: "01", name: "Rak A" },
+  { id: 4101, warehouseId: 401, parentId: 4100, level: 2, code: "01-01", name: "Baris 1" },
+  { id: 4102, warehouseId: 401, parentId: 4101, level: 3, code: "01-01-01", name: "Bin 1" },
+  { id: 4103, warehouseId: 401, parentId: 4101, level: 3, code: "01-01-02", name: "Bin 2" },
+  { id: 4104, warehouseId: 402, parentId: null, level: 1, code: "01", name: "Area Packing 1" },
+  { id: 4105, warehouseId: 402, parentId: null, level: 1, code: "02", name: "Area Packing 2" },
+  { id: 4106, warehouseId: 403, parentId: null, level: 1, code: "01", name: "Rak Bahan Baku 1" },
+  { id: 4107, warehouseId: 404, parentId: null, level: 1, code: "01", name: "Blok Distribusi A" }
 ];
 
 let nextStorageLocationId = 4200;
@@ -2561,19 +2795,259 @@ export function getStorageLocations(warehouseId: number): StorageLocation[] {
   return STORAGE_LOCATIONS.filter((location) => location.warehouseId === warehouseId);
 }
 
-export function createStorageLocation(
-  warehouseId: number,
-  code: string,
-  name: string
-): StorageLocation {
+export interface StorageLocationInput {
+  warehouseId: number;
+  /** null puts the location straight in the warehouse. */
+  parentId: number | null;
+  name: string;
+}
+
+/**
+ * Codes are derived, not typed — the form asks only where the location goes and
+ * what it is called. A location's code is its parent's plus its own two-digit
+ * position, so the code reads as the path to it: `A-01-02`.
+ */
+function nextStorageLocationCode(warehouseId: number, parentId: number | null): string {
+  const siblings = STORAGE_LOCATIONS.filter(
+    (location) => location.warehouseId === warehouseId && location.parentId === parentId
+  );
+  const position = String(siblings.length + 1).padStart(2, "0");
+  const parent = parentId === null ? undefined : getStorageLocationById(parentId);
+  return parent ? `${parent.code}-${position}` : position;
+}
+
+export function getStorageLocationById(id: number): StorageLocation | undefined {
+  return STORAGE_LOCATIONS.find((location) => location.id === id);
+}
+
+/** Every location in a warehouse, deepest-last, so a picker can show a parent
+ *  before the things inside it. */
+export function getStorageLocationTree(warehouseId: number): StorageLocation[] {
+  return getStorageLocations(warehouseId)
+    .slice()
+    .sort((a, b) => a.level - b.level);
+}
+
+/** "Rak A / Baris 1 / Bin 2" — a location named by its whole path, which is the
+ *  only way a bare "Bin 2" can be told from the other seven of them. */
+export function storageLocationPath(location: StorageLocation): string {
+  const parent = location.parentId === null ? undefined : getStorageLocationById(location.parentId);
+  return parent ? `${storageLocationPath(parent)} / ${location.name}` : location.name;
+}
+
+export function createStorageLocation(input: StorageLocationInput): StorageLocation {
+  const parent = input.parentId === null ? undefined : getStorageLocationById(input.parentId);
   const location: StorageLocation = {
     id: nextStorageLocationId++,
-    warehouseId,
-    code: code.trim(),
-    name: name.trim()
+    warehouseId: input.warehouseId,
+    parentId: input.parentId,
+    level: parent ? parent.level + 1 : 1,
+    code: nextStorageLocationCode(input.warehouseId, input.parentId),
+    name: input.name.trim()
   };
   STORAGE_LOCATIONS.push(location);
   return location;
+}
+
+/**
+ * Where stock may actually be put away: a level the warehouse marked as a
+ * storing preference. A three-level warehouse that stores at Bin only should
+ * not offer its Racks, or two people would count the same goods twice — once
+ * on the rack and once in the bin inside it.
+ */
+export function getStorableLocations(warehouseId: number): StorageLocation[] {
+  const warehouse = getWarehouseById(warehouseId);
+  if (!warehouse) return [];
+  const storableLevels = warehouse.storageLevels
+    .map((level, index) => (level.isStoringPreference ? index + 1 : 0))
+    .filter((level) => level > 0);
+  return getStorageLocationTree(warehouseId).filter((location) =>
+    storableLevels.includes(location.level)
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Location types — the vocabulary a warehouse's storage levels are named from
+// ---------------------------------------------------------------------------
+
+/**
+ * A tenant-wide list of names a storage level can be called: Area, Rack, Bin.
+ *
+ * The names live here rather than on the warehouse because two warehouses that
+ * both call their top level "Area" mean the same thing by it, and because the
+ * source manages them on one screen ("Location type management") — renaming
+ * one there renames it everywhere it is used.
+ */
+export interface LocationType {
+  id: number;
+  name: string;
+}
+
+/** The source disables its Add button at twenty, with a tooltip saying so. */
+export const MAX_LOCATION_TYPES = 20;
+
+/** A location type's name is what appears in a warehouse's Level column. */
+export const LOCATION_TYPE_NAME_MAX_LENGTH = 20;
+
+const LOCATION_TYPES: LocationType[] = [
+  { id: 4300, name: "Area" },
+  { id: 4301, name: "Zone" },
+  { id: 4302, name: "Row" },
+  { id: 4303, name: "Rack" },
+  { id: 4304, name: "Shelf" },
+  { id: 4305, name: "Bin" }
+];
+
+let nextLocationTypeId = 4400;
+
+export function getLocationTypes(): LocationType[] {
+  return LOCATION_TYPES.slice().sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function getLocationTypeById(id: number): LocationType | undefined {
+  return LOCATION_TYPES.find((type) => type.id === id);
+}
+
+/** Names are the identity here — a second "Rack" would make the warehouse
+ *  form's picker ambiguous — so this is what the form validates against. */
+export function isLocationTypeNameTaken(name: string, exceptId?: number): boolean {
+  const wanted = name.trim().toLowerCase();
+  return LOCATION_TYPES.some((type) => type.id !== exceptId && type.name.toLowerCase() === wanted);
+}
+
+/**
+ * True once a warehouse names one of its levels this. Editing or deleting such
+ * a type is blocked — the warehouses using it would be left describing their
+ * shelves with a word that no longer exists.
+ */
+export function isLocationTypeInUse(id: number): boolean {
+  const type = getLocationTypeById(id);
+  if (!type) return false;
+  return WAREHOUSES.some((warehouse) =>
+    warehouse.storageLevels.some((level) => level.type === type.name)
+  );
+}
+
+export function createLocationType(name: string): LocationType {
+  const type: LocationType = { id: nextLocationTypeId++, name: name.trim() };
+  LOCATION_TYPES.push(type);
+  return type;
+}
+
+export function renameLocationType(id: number, name: string): void {
+  const type = getLocationTypeById(id);
+  if (type) type.name = name.trim();
+}
+
+export function deleteLocationType(id: number): void {
+  const index = LOCATION_TYPES.findIndex((type) => type.id === id);
+  if (index >= 0) LOCATION_TYPES.splice(index, 1);
+}
+
+// ---------------------------------------------------------------------------
+// Storage location feature — the company-level switch, and per-location stock
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether this company keeps stock at locations inside its warehouses at all.
+ *
+ * Off, a warehouse is one undivided space: no storage-level table on the
+ * warehouse form, no locations tab, and no location to set on a movement. The
+ * setting exists because the finer bookkeeping is only worth it for companies
+ * that actually need it, and the source gates the whole feature on it.
+ */
+let storageLocationFeatureActive = true;
+
+export function isStorageLocationFeatureActive(): boolean {
+  return storageLocationFeatureActive;
+}
+
+/** One product's stock in one location. */
+export interface StorageStock {
+  locationId: number;
+  productId: number;
+  quantity: number;
+}
+
+// Only the storing-preference levels hold stock — a Bin in Main Warehouse, an
+// Area in the depots — so these line up with `getStorableLocations`.
+const STORAGE_STOCK: StorageStock[] = [
+  { locationId: 4102, productId: 1, quantity: 740 },
+  { locationId: 4103, productId: 1, quantity: 500 },
+  { locationId: 4102, productId: 2, quantity: 60 },
+  { locationId: 4104, productId: 3, quantity: 320 },
+  { locationId: 4105, productId: 3, quantity: 120 },
+  { locationId: 4104, productId: 4, quantity: 75 },
+  { locationId: 4106, productId: 5, quantity: 40 },
+  { locationId: 4107, productId: 6, quantity: 90 }
+];
+
+/** What a location holds of a product — 0 for a location it has never held. */
+export function getLocationStock(locationId: number, productId: number): number {
+  return (
+    STORAGE_STOCK.find((entry) => entry.locationId === locationId && entry.productId === productId)
+      ?.quantity ?? 0
+  );
+}
+
+/** Every storable location in a warehouse with what it holds of this product,
+ *  which is what the "Pick from location" list needs to show. */
+export function getStorageStockFor(
+  productId: number,
+  warehouseId: number
+): { location: StorageLocation; stock: number }[] {
+  return getStorableLocations(warehouseId).map((location) => ({
+    location,
+    stock: getLocationStock(location.id, productId)
+  }));
+}
+
+/**
+ * Once stock sits in a location, the feature can't be switched off: the
+ * quantities recorded against those locations have nowhere to go, and the
+ * source shows a modal saying exactly that rather than silently discarding
+ * them.
+ */
+export function canDeactivateStorageLocations(): boolean {
+  return STORAGE_STOCK.every((entry) => entry.quantity === 0);
+}
+
+/** Returns false when the switch-off was refused, so the caller can show the
+ *  modal explaining why rather than reporting a save that didn't happen. */
+export function setStorageLocationFeatureActive(isActive: boolean): boolean {
+  if (!isActive && !canDeactivateStorageLocations()) return false;
+  storageLocationFeatureActive = isActive;
+  return true;
+}
+
+/**
+ * How much of a movement's quantity goes to (or comes from) one location.
+ * A line carries a list of these; they must add up to the line's own quantity,
+ * which is what the drawer's "Total must be equal" check enforces.
+ */
+export interface LocationAllocation {
+  locationId: number;
+  quantity: number;
+}
+
+/** Applies an allocation set to the stored per-location stock: positive for a
+ *  put-away, negative for a pick. */
+export function applyLocationAllocations(
+  productId: number,
+  allocations: LocationAllocation[],
+  direction: "store" | "pick"
+): void {
+  const sign = direction === "store" ? 1 : -1;
+  allocations.forEach(({ locationId, quantity }) => {
+    const entry = STORAGE_STOCK.find(
+      (row) => row.locationId === locationId && row.productId === productId
+    );
+    if (entry) {
+      entry.quantity = Math.max(0, entry.quantity + sign * quantity);
+      return;
+    }
+    if (sign > 0) STORAGE_STOCK.push({ locationId, productId, quantity });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -2600,12 +3074,13 @@ export interface WarehouseInput {
   code: string;
   name: string;
   address: string;
-  pic: string;
+  pics: string[];
   description: string;
+  storageLevels: StorageLevel[];
 }
 
 export function emptyWarehouseInput(): WarehouseInput {
-  return { code: "", name: "", address: "", pic: "", description: "" };
+  return { code: "", name: "", address: "", pics: [], description: "", storageLevels: [] };
 }
 
 export function warehouseToInput(warehouse: Warehouse): WarehouseInput {
@@ -2613,8 +3088,9 @@ export function warehouseToInput(warehouse: Warehouse): WarehouseInput {
     code: warehouse.code,
     name: warehouse.name,
     address: warehouse.address,
-    pic: warehouse.pic,
-    description: warehouse.description
+    pics: [...warehouse.pics],
+    description: warehouse.description,
+    storageLevels: warehouse.storageLevels.map((level) => ({ ...level }))
   };
 }
 
@@ -2626,7 +3102,8 @@ export function createWarehouse(input: WarehouseInput): Warehouse {
     code: input.code.trim(),
     name: input.name.trim(),
     address: input.address.trim(),
-    pic: input.pic.trim(),
+    pics: [...input.pics],
+    storageLevels: input.storageLevels.map((level) => ({ ...level })),
     description: input.description.trim(),
     isActive: true
   };
@@ -2641,7 +3118,8 @@ export function updateWarehouse(id: number, input: WarehouseInput): Warehouse | 
     code: input.code.trim(),
     name: input.name.trim(),
     address: input.address.trim(),
-    pic: input.pic.trim(),
+    pics: [...input.pics],
+    storageLevels: input.storageLevels.map((level) => ({ ...level })),
     description: input.description.trim()
   });
   return warehouse;
@@ -2690,6 +3168,9 @@ export function getAdjacentStockAdjustmentIds(id: number): {
 }
 
 export interface StockAdjustmentInput {
+  /** Blank means "let the system number it" — the form shows `[Auto]` and only
+   *  a deliberately typed number overrides it. */
+  number: string;
   date: string;
   adjustmentType: AdjustmentType;
   category: string;
@@ -2702,6 +3183,7 @@ export interface StockAdjustmentInput {
 
 export function emptyStockAdjustmentInput(): StockAdjustmentInput {
   return {
+    number: "",
     date: todayIsoDate(),
     adjustmentType: "stock_count",
     category: ADJUSTMENT_CATEGORY_OPTIONS[0] ?? "",
@@ -2715,6 +3197,7 @@ export function emptyStockAdjustmentInput(): StockAdjustmentInput {
 
 export function stockAdjustmentToInput(record: StockAdjustment): StockAdjustmentInput {
   return {
+    number: record.number,
     date: record.date,
     adjustmentType: record.adjustmentType,
     category: record.category,
@@ -2753,7 +3236,7 @@ export function createStockAdjustment(input: StockAdjustmentInput): StockAdjustm
   const record: StockAdjustment = {
     id: nextAdjustmentId++,
     date: input.date,
-    number: adjustmentNumber(nextAdjustmentId),
+    number: input.number.trim() || adjustmentNumber(nextAdjustmentId),
     adjustmentType: input.adjustmentType,
     category: input.category,
     account: input.account,
@@ -2774,6 +3257,8 @@ export function updateStockAdjustment(
   const record = getStockAdjustmentById(id);
   if (!record) return undefined;
   Object.assign(record, {
+    // A blank number keeps the one it already has rather than clearing it.
+    number: input.number.trim() || record.number,
     date: input.date,
     adjustmentType: input.adjustmentType,
     category: input.category,
@@ -2828,25 +3313,32 @@ export function getAdjacentTransferIds(id: number): {
 }
 
 export interface WarehouseTransferInput {
+  /** Blank means "let the system number it" — the form shows `[Auto]`. */
+  number: string;
   date: string;
   fromWarehouse: string;
   toWarehouse: string;
   memo: string;
+  attachments: string[];
   lines: TransferLine[];
 }
 
 export function emptyWarehouseTransferInput(): WarehouseTransferInput {
   return {
+    number: "",
     date: todayIsoDate(),
     fromWarehouse: "",
     toWarehouse: "",
     memo: "",
+    attachments: [],
     lines: []
   };
 }
 
 export function warehouseTransferToInput(record: WarehouseTransfer): WarehouseTransferInput {
   return {
+    number: record.number,
+    attachments: [...record.attachments],
     date: record.date,
     fromWarehouse: record.fromWarehouse,
     toWarehouse: record.toWarehouse,
@@ -2855,13 +3347,28 @@ export function warehouseTransferToInput(record: WarehouseTransfer): WarehouseTr
   };
 }
 
-export function transferLineForProduct(product: Product): TransferLine {
+/**
+ * A blank transfer line for a product, read against the two warehouses the
+ * transfer moves between.
+ *
+ * A product's stock lives in one warehouse here (`Product.warehouse`), so the
+ * figures are its whole quantity at whichever end holds it and zero at the
+ * other. That is what makes "qty before/after" on both ends meaningful rather
+ * than the same number printed twice.
+ */
+export function transferLineForProduct(
+  product: Product,
+  fromWarehouse: string,
+  toWarehouse: string
+): TransferLine {
+  const held = product.quantity ?? 0;
   return {
     productId: product.id,
     name: product.name,
     unit: product.unit,
     quantity: 0,
-    quantityAtSource: product.quantity ?? 0
+    quantityAtSource: product.warehouse === fromWarehouse ? held : 0,
+    quantityAtDestination: product.warehouse === toWarehouse ? held : 0
   };
 }
 
@@ -2871,10 +3378,11 @@ export function createWarehouseTransfer(input: WarehouseTransferInput): Warehous
   const record: WarehouseTransfer = {
     id: nextTransferId++,
     date: input.date,
-    number: `WT/2026/09/${String(nextTransferId % 10000).padStart(4, "0")}`,
+    number: input.number.trim() || `WT/2026/09/${String(nextTransferId % 10000).padStart(4, "0")}`,
     fromWarehouse: input.fromWarehouse,
     toWarehouse: input.toWarehouse,
     memo: input.memo.trim(),
+    attachments: [...input.attachments],
     lines: input.lines.map((line) => ({ ...line }))
   };
   WAREHOUSE_TRANSFERS.unshift(record);
@@ -2888,10 +3396,13 @@ export function updateWarehouseTransfer(
   const record = getWarehouseTransferById(id);
   if (!record) return undefined;
   Object.assign(record, {
+    // A blank number keeps the one it already has rather than clearing it.
+    number: input.number.trim() || record.number,
     date: input.date,
     fromWarehouse: input.fromWarehouse,
     toWarehouse: input.toWarehouse,
     memo: input.memo.trim(),
+    attachments: [...input.attachments],
     lines: input.lines.map((line) => ({ ...line }))
   });
   return record;

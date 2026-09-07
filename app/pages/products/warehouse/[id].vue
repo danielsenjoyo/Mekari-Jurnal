@@ -33,18 +33,15 @@
       </MpTooltip>
     </template>
 
-    <div v-if="!warehouse" :class="notFoundClass">
-      <img src="/illustrations/search-not-found.png" alt="" :class="notFoundIllustrationClass" />
-      <MpText weight="semiBold" color="dark" :class="notFoundTitleClass">
-        Warehouse not found
-      </MpText>
-      <MpText size="body-small" color="gray.600" :class="notFoundDescClass">
-        This warehouse may have been deleted, or the link you followed may be out of date.
-      </MpText>
+    <BlankSlate
+      v-if="!warehouse"
+      title="Warehouse not found"
+      description="This warehouse may have been deleted, or the link you followed may be out of date."
+    >
       <MpButton variant="secondary" @click="navigateTo('/products?tab=warehouses')">
         Back to Warehouse list
       </MpButton>
-    </div>
+    </BlankSlate>
 
     <template v-else>
       <!-- Zone A. A warehouse's headline figure is how much it is holding —
@@ -56,8 +53,8 @@
         </div>
 
         <div :class="metaFieldClass">
-          <MpText color="gray.600">PIC</MpText>
-          <MpText>{{ warehouse.pic || "—" }}</MpText>
+          <MpText color="gray.600">Person in charge</MpText>
+          <MpText>{{ warehouse.pics.join(", ") || "—" }}</MpText>
         </div>
 
         <div :class="headlineColClass">
@@ -97,14 +94,14 @@
       <div :class="relatedSectionClass">
         <MpTabs v-model="activeTabIndex" is-manual variant-color="blue">
           <MpTabList>
-            <MpTab><span :class="tabLabelClass">Product list</span></MpTab>
-            <MpTab><span :class="tabLabelClass">Location list</span></MpTab>
-            <MpTab><span :class="tabLabelClass">Transaction list</span></MpTab>
+            <MpTab v-for="tab in tabs" :key="tab.key">
+              <span :class="tabLabelClass">{{ tab.label }}</span>
+            </MpTab>
           </MpTabList>
         </MpTabs>
 
         <!-- Products held here -->
-        <div v-if="activeTabIndex === 0" :class="relatedBodyClass">
+        <div v-if="activeTabKey === 'products'" :class="relatedBodyClass">
           <MpTableContainer v-if="products.length" :class="scrollShadowClass">
             <MpTable :class="relatedTableClass">
               <MpTableHead is-fixed :class="tableHeadClass">
@@ -144,19 +141,27 @@
         </div>
 
         <!-- Storage locations -->
-        <div v-if="activeTabIndex === 1" :class="relatedBodyClass">
+        <div v-if="activeTabKey === 'locations'" :class="relatedBodyClass">
           <MpTableContainer v-if="locations.length">
             <MpTable :class="relatedTableClass">
               <MpTableHead is-fixed :class="tableHeadClass">
                 <MpTableRow>
                   <MpTableCell as="th">Location code</MpTableCell>
                   <MpTableCell as="th">Location name</MpTableCell>
+                  <MpTableCell as="th">Storage type</MpTableCell>
                 </MpTableRow>
               </MpTableHead>
               <MpTableBody>
                 <MpTableRow v-for="location in locations" :key="location.id">
                   <MpTableCell as="td" :class="wrapCellClass">{{ location.code }}</MpTableCell>
-                  <MpTableCell as="td" :class="wrapCellClass">{{ location.name }}</MpTableCell>
+                  <!-- Named by its path: a bare "Bin 1" can't be told from the
+                       other seven of them. -->
+                  <MpTableCell as="td" :class="wrapCellClass">
+                    {{ storageLocationPath(location) }}
+                  </MpTableCell>
+                  <MpTableCell as="td" :class="wrapCellClass">
+                    {{ storageLevelTypeAt(warehouse, location.level) || "—" }}
+                  </MpTableCell>
                 </MpTableRow>
               </MpTableBody>
             </MpTable>
@@ -175,7 +180,7 @@
         </div>
 
         <!-- Movements touching this warehouse -->
-        <div v-if="activeTabIndex === 2" :class="relatedBodyClass">
+        <div v-if="activeTabKey === 'transactions'" :class="relatedBodyClass">
           <MpTableContainer v-if="transactions.length" :class="scrollShadowClass">
             <MpTable :class="relatedTableClass">
               <MpTableHead is-fixed :class="tableHeadClass">
@@ -285,42 +290,14 @@
         </MpModalContent>
       </MpModal>
 
-      <!-- A storage location is two fields, so it is a drawer rather than a
-           page — same call the source makes (docs/patterns/Drawer.md). -->
-      <MpDrawer
+      <!-- The same drawer the Products list's Actions menu opens, with the
+           warehouse already known here (docs/patterns/Drawer.md). -->
+      <StorageLocationDrawer
         :is-open="isLocationDrawerOpen"
-        placement="right"
-        size="sm"
+        :warehouse-id="warehouseId"
         @close="isLocationDrawerOpen = false"
-      >
-        <MpDrawerOverlay />
-        <MpDrawerContent>
-          <MpDrawerHeader>
-            <span :class="drawerTitleClass">Add new storage location</span>
-            <MpDrawerCloseButton />
-          </MpDrawerHeader>
-          <MpDrawerBody>
-            <div :class="drawerFormClass">
-              <MpFormControl is-required :is-invalid="locationSubmitted && !locationCode.trim()">
-                <MpFormLabel>Location code</MpFormLabel>
-                <MpInput v-model="locationCode" placeholder="Example: A-01-01" />
-                <MpFormErrorMessage>Enter a location code</MpFormErrorMessage>
-              </MpFormControl>
-              <MpFormControl is-required :is-invalid="locationSubmitted && !locationName.trim()">
-                <MpFormLabel>Location name</MpFormLabel>
-                <MpInput v-model="locationName" placeholder="Example: Rak A / Baris 1 / Bin 1" />
-                <MpFormErrorMessage>Enter a location name</MpFormErrorMessage>
-              </MpFormControl>
-            </div>
-          </MpDrawerBody>
-          <MpDrawerFooter>
-            <div :class="drawerFooterClass">
-              <MpButton variant="ghost" @click="isLocationDrawerOpen = false">Cancel</MpButton>
-              <MpButton variant="primary" @click="saveLocation">Save</MpButton>
-            </div>
-          </MpDrawerFooter>
-        </MpDrawerContent>
-      </MpDrawer>
+        @created="onLocationCreated"
+      />
     </template>
   </DefaultPageContent>
 </template>
@@ -335,18 +312,7 @@ import {
   MpBannerIcon,
   MpButton,
   MpDivider,
-  MpDrawer,
-  MpDrawerBody,
-  MpDrawerCloseButton,
-  MpDrawerContent,
-  MpDrawerFooter,
-  MpDrawerHeader,
-  MpDrawerOverlay,
   MpFlex,
-  MpFormControl,
-  MpFormErrorMessage,
-  MpFormLabel,
-  MpInput,
   MpModal,
   MpModalBody,
   MpModalCloseButton,
@@ -377,7 +343,6 @@ import {
   ACTIVE_STATUS_LABEL,
   ACTIVE_STATUS_TYPE,
   ADJUSTMENT_TYPE_LABEL,
-  createStorageLocation,
   deleteProductRecords,
   formatCount,
   formatDisplayDate,
@@ -386,7 +351,10 @@ import {
   getProducts,
   getStockAdjustments,
   getStorageLocations,
+  isStorageLocationFeatureActive,
   getWarehouseById,
+  storageLevelTypeAt,
+  storageLocationPath,
   getWarehouseTransfers,
   setWarehouseActive,
   type ActiveStatus
@@ -481,12 +449,28 @@ const transactions = computed<WarehouseTransactionRow[]>(() => {
   return [...adjustments, ...transfers].sort((a, b) => b.date.localeCompare(a.date));
 });
 
-const activeTabIndex = ref(0);
+/** The tabs, in render order — `?tab=` names one so a link can land on it
+ *  (docs/patterns/form-page-format.md § "a tab is a destination"). Location
+ *  list is absent while the storage-location feature is off: with the feature
+ *  down there are no locations to list, and an empty tab reads as a warehouse
+ *  that lost them. */
+const tabs = computed(() => {
+  const list: { key: string; label: string }[] = [{ key: "products", label: "Product list" }];
+  if (isStorageLocationFeatureActive()) list.push({ key: "locations", label: "Location list" });
+  list.push({ key: "transactions", label: "Transaction list" });
+  return list;
+});
+
+const activeTabIndex = ref(
+  Math.max(
+    0,
+    tabs.value.findIndex((tab) => tab.key === String(route.query.tab))
+  )
+);
+
+const activeTabKey = computed(() => tabs.value[activeTabIndex.value]?.key ?? "products");
 const isDeleteModalOpen = ref(false);
 const isLocationDrawerOpen = ref(false);
-const locationCode = ref("");
-const locationName = ref("");
-const locationSubmitted = ref(false);
 const actionError = ref("");
 
 function goTo(id: number | null) {
@@ -502,18 +486,11 @@ function openTransaction(row: WarehouseTransactionRow) {
 }
 
 function openLocationDrawer() {
-  locationCode.value = "";
-  locationName.value = "";
-  locationSubmitted.value = false;
   isLocationDrawerOpen.value = true;
 }
 
-function saveLocation() {
-  locationSubmitted.value = true;
-  if (!locationCode.value.trim() || !locationName.value.trim()) return;
-  createStorageLocation(warehouseId.value, locationCode.value, locationName.value);
+function onLocationCreated() {
   refreshTick.value++;
-  isLocationDrawerOpen.value = false;
   // Land the user on the list they just added to.
   activeTabIndex.value = 1;
 }
@@ -552,7 +529,7 @@ const metaGridClass = css({ display: "grid", gridTemplateColumns: "repeat(3, 1fr
 const metaFieldClass = css({ display: "flex", flexDirection: "column", gap: 1, minWidth: "0" });
 const wrapValueClass = css({ whiteSpace: "normal", wordBreak: "break-word" });
 
-const relatedSectionClass = css({ mt: 10 });
+const relatedSectionClass = css({ mt: 8 });
 const relatedBodyClass = css({ pt: 4 });
 const relatedTableClass = css({ tableLayout: "auto", width: "full", minWidth: "640px" });
 const tableHeadClass = css({ boxShadow: "0 1px 0 0 var(--mp-colors-gray-100)!" });
@@ -576,29 +553,8 @@ const scrollShadowClass = css({
 
 const errorBannerClass = css({ mt: 4 });
 
-const notFoundClass = css({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 3,
-  py: 16,
-  textAlign: "center"
-});
-const notFoundTitleClass = css({ fontSize: "lg" });
-const notFoundIllustrationClass = css({ width: "180px", height: "auto", mb: 1 });
-const notFoundDescClass = css({ maxWidth: "320px" });
-
 const modalTitleClass = css({ fontSize: "lg" });
 const modalFooterClass = css({ display: "flex", justifyContent: "flex-end", gap: 2 });
-
-const drawerTitleClass = css({ fontSize: "lg" });
-const drawerFormClass = css({ display: "flex", flexDirection: "column", gap: 4 });
-const drawerFooterClass = css({
-  display: "flex",
-  justifyContent: "flex-end",
-  gap: 2,
-  width: "full"
-});
 
 const bottomActionsClass = css({
   display: "flex",

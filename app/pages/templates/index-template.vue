@@ -409,15 +409,8 @@
     <!-- Blank slate — replaces the table entirely when there are no rows.
          Library "search not found" pattern: 3D illustration + title + body
          (no CTA). Copy adapts to search vs. filter vs. genuinely-empty. -->
-    <div v-else :class="emptyStateClass">
-      <img src="/illustrations/search-not-found.png" alt="" :class="emptyIllustrationClass" />
-      <MpText weight="semiBold" color="dark" :class="emptyTitleClass">
-        {{ emptyTitle }}
-      </MpText>
-      <MpText size="body-small" color="gray.600" :class="emptyDescClass">
-        {{ emptyDescription }}
-      </MpText>
-    </div>
+    <BlankSlate v-else :variant="emptyVariant" :title="emptyTitle" :description="emptyDescription">
+    </BlankSlate>
   </DefaultPageContent>
 </template>
 
@@ -760,6 +753,12 @@ function onJumpPage(val: unknown) {
 
 // Blank-slate copy adapts to the cause of the empty result: a search keyword,
 // a quick filter, or a genuinely empty data source.
+/** A list that has simply never had a row is not a failed search, and must
+ *  not borrow the magnifier illustration to say so. */
+const emptyVariant = computed(() =>
+  searchTerm.value || filterCategory.value || filterStatus.value ? "not-found" : "no-data"
+);
+
 const emptyTitle = computed(() => {
   if (searchTerm.value) return `"${searchTerm.value}" not found`;
   if (filterCategory.value || filterStatus.value) return "No results found";
@@ -946,18 +945,7 @@ const skeletonBarClass = css({ display: "block", height: "4", rounded: "sm" });
 
 // Blank slate — centred column: 3D illustration, 16px (lg) title, capped-width
 // body (no CTA). Matches the library "search not found" pattern.
-const emptyStateClass = css({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 3,
-  py: 16,
-  textAlign: "center"
-});
 // Illustration is a 1500×1250 source (6:5) shown at 180px wide.
-const emptyIllustrationClass = css({ width: "180px", height: "auto", mb: 1 });
-const emptyTitleClass = css({ fontSize: "lg" });
-const emptyDescClass = css({ maxWidth: "320px" });
 
 // Pagination footer — no top border (matches the library pagination pattern).
 const paginationClass = css({

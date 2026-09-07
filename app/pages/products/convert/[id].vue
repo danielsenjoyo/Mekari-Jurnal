@@ -4,16 +4,13 @@
     breadcrumb="Product list"
     breadcrumb-to="/products"
   >
-    <div v-if="!conversion" :class="notFoundClass">
-      <img src="/illustrations/search-not-found.png" alt="" :class="notFoundIllustrationClass" />
-      <MpText weight="semiBold" color="dark" :class="notFoundTitleClass">
-        Conversion not found
-      </MpText>
-      <MpText size="body-small" color="gray.600" :class="notFoundDescClass">
-        This conversion may have been reverted, or the link you followed may be out of date.
-      </MpText>
+    <BlankSlate
+      v-if="!conversion"
+      title="Conversion not found"
+      description="This conversion may have been reverted, or the link you followed may be out of date."
+    >
       <MpButton variant="secondary" @click="navigateTo('/products')">Back to Product list</MpButton>
-    </div>
+    </BlankSlate>
 
     <template v-else>
       <MpBanner id="conversion-detail-banner" variant="info" is-inline :class="bannerClass">
@@ -312,18 +309,6 @@ const totalsLineClass = css({ display: "flex", justifyContent: "space-between", 
 const totalsDividerClass = css({ my: 2 });
 
 const bulletListClass = css({ pl: 5, mt: 2, listStyleType: "disc" });
-
-const notFoundClass = css({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 3,
-  py: 16,
-  textAlign: "center"
-});
-const notFoundTitleClass = css({ fontSize: "lg" });
-const notFoundIllustrationClass = css({ width: "180px", height: "auto", mb: 1 });
-const notFoundDescClass = css({ maxWidth: "320px" });
 
 const modalTitleClass = css({ fontSize: "lg" });
 const modalFooterClass = css({ display: "flex", justifyContent: "flex-end", gap: 2 });

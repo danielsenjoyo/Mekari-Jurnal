@@ -103,7 +103,9 @@
                 @focusout="onMoneyBlur('remainingGt')"
               >
                 <MpInputGroup>
-                  <MpInputLeftAddon>Rp</MpInputLeftAddon>
+                  <MpInputLeftAddon>
+                    <MpText weight="semiBold" :class="addonTextClass">Rp</MpText>
+                  </MpInputLeftAddon>
                   <MpInput
                     v-model="text.remainingGt"
                     type="text"
@@ -121,7 +123,9 @@
                 @focusout="onMoneyBlur('remainingLt')"
               >
                 <MpInputGroup>
-                  <MpInputLeftAddon>Rp</MpInputLeftAddon>
+                  <MpInputLeftAddon>
+                    <MpText weight="semiBold" :class="addonTextClass">Rp</MpText>
+                  </MpInputLeftAddon>
                   <MpInput
                     v-model="text.remainingLt"
                     type="text"
@@ -153,7 +157,9 @@
                 @focusout="onMoneyBlur('totalGt')"
               >
                 <MpInputGroup>
-                  <MpInputLeftAddon>Rp</MpInputLeftAddon>
+                  <MpInputLeftAddon>
+                    <MpText weight="semiBold" :class="addonTextClass">Rp</MpText>
+                  </MpInputLeftAddon>
                   <MpInput
                     v-model="text.totalGt"
                     type="text"
@@ -169,7 +175,9 @@
                 @focusout="onMoneyBlur('totalLt')"
               >
                 <MpInputGroup>
-                  <MpInputLeftAddon>Rp</MpInputLeftAddon>
+                  <MpInputLeftAddon>
+                    <MpText weight="semiBold" :class="addonTextClass">Rp</MpText>
+                  </MpInputLeftAddon>
                   <MpInput
                     v-model="text.totalLt"
                     type="text"
@@ -435,6 +443,10 @@ function onApply() {
 }
 
 // All css() below uses Pixel 3 token shortcuts only (token mode 2.1).
+// The addon supplies no padding of its own: Pixel's "input with prefix and
+// suffix" pattern (docs.mekari.design/patterns/input.html) pads the addon's
+// content by 12px, without which the prefix sits flush against both edges.
+const addonTextClass = css({ px: 3 });
 const titleClass = css({ fontSize: "lg" });
 const formClass = css({ display: "flex", flexDirection: "column", gap: 5 });
 const rangeRowClass = css({

@@ -20,6 +20,7 @@ and the `@mekari/pixel3` component library.
 | Work on the Home landing page                   | [`patterns/home-page-format.md`](./patterns/home-page-format.md)                                                        |
 | Build a catalog page (tabs → grid of links)     | [`patterns/reports-index-format.md`](./patterns/reports-index-format.md)                                                |
 | Build a report screen (range → run → totals)    | [`patterns/reports-page-format.md`](./patterns/reports-page-format.md)                                                  |
+| Work on warehouse storage locations             | [`storage-locations.md`](./storage-locations.md)                                                                        |
 
 ## Map
 
@@ -61,6 +62,7 @@ implementation [`app/pages/templates/index-template.vue`](../app/pages/templates
 ### Deep reference
 
 - **[`index-page-pattern.md`](./index-page-pattern.md)** — the exhaustive index-page reference (full rationale, state-model table, component gotchas, changelog). The `patterns/` files are the focused extract; this is the long form.
+- **[`storage-locations.md`](./storage-locations.md)** — the Products module's storage-location feature: the company switch, the location-type list, and the Set location / Pick from location drawer that splits a movement across shelves.
 
 ### Compliance gate
 

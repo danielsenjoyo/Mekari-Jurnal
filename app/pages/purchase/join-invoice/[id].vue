@@ -33,16 +33,13 @@
       </MpTooltip>
     </template>
 
-    <div v-if="!joinInvoice" :class="notFoundClass">
-      <img src="/illustrations/search-not-found.png" alt="" :class="notFoundIllustrationClass" />
-      <MpText weight="semiBold" color="dark" :class="notFoundTitleClass"
-        >Join invoice not found</MpText
-      >
-      <MpText size="body-small" color="gray.600" :class="notFoundDescClass">
-        This join invoice may have been deleted, or the link you followed may be out of date.
-      </MpText>
+    <BlankSlate
+      v-if="!joinInvoice"
+      title="Join invoice not found"
+      description="This join invoice may have been deleted, or the link you followed may be out of date."
+    >
       <MpButton variant="secondary" @click="navigateTo('/purchase')">Back to Purchases</MpButton>
-    </div>
+    </BlankSlate>
 
     <template v-else>
       <!-- Section heading — unique to this page in the reference
@@ -396,16 +393,4 @@ const totalCardClass = css({
   borderColor: "gray.100",
   rounded: "md"
 });
-
-const notFoundClass = css({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 3,
-  py: 16,
-  textAlign: "center"
-});
-const notFoundTitleClass = css({ fontSize: "lg" });
-const notFoundIllustrationClass = css({ width: "180px", height: "auto", mb: 1 });
-const notFoundDescClass = css({ maxWidth: "320px" });
 </script>

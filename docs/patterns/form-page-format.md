@@ -314,20 +314,45 @@ is `""` for exactly that reason.
 | ------------------------------------------- | --------- | ------------------------------------------------------------------- |
 | `/products`                                 | index     | 3 segments × 8 list tabs; `?tab=`/`?segment=` deep links            |
 | `/products/detail/[id]`                     | details   | Tabs gated per product: bundle, batch, warehouse                    |
-| `/products/new` + `/products/edit/[id]`     | **form**  | `ProductForm` — three checkboxes gate three whole sections          |
+| `/products/new` + `/products/edit/[id]`     | **form**  | `ProductForm` — narrow column; two choices gate the rest (below)    |
 | `/products/master/[id]`                     | details   | Variants are child rows, not links — they have no page of their own |
-| `/products/master/new` + `master/edit/[id]` | **form**  | `ProductMasterForm` — variants generated from the attributes        |
+| `/products/master/new` + `master/edit/[id]` | **form**  | `ProductMasterForm` — rows generated, cells entered (below)         |
 | `/products/[id]/batches/[batchId]`          | details   | Nested under its product; no batch list exists                      |
 | `/products/convert/new` + `convert/[id]`    | **form**  | `ProductConversionForm` — lines come from the bundle, not a picker  |
 | `/products/price-rules/new` + `edit/[id]`   | **form**  | `PriceRuleForm` — field set driven by `PRICE_RULE_SHAPE`            |
 | `/products/warehouse/[id]`                  | details   | Products held, storage locations (drawer), movements                |
-| `/products/warehouse/new` + `edit/[id]`     | **form**  | `WarehouseForm`                                                     |
+| `/products/warehouse/new` + `edit/[id]`     | **form**  | `WarehouseForm` — narrow column + an ordered storage-level table    |
 | `/products/stock-adjustment/[id]`           | details   | Also serves the approval queue — see below                          |
 | `/products/stock-adjustment/new` + `edit`   | **form**  | `StockAdjustmentForm` — `?type=` presets the adjustment type        |
 | `/products/warehouse-transfer/[id]`         | details   | Also serves the approval queue; Clone opens the form pre-filled     |
 | `/products/warehouse-transfer/new` + `edit` | **form**  | `WarehouseTransferForm` — `?from=` seeds a clone; per-line cap      |
 
-Five rules this module added to the ones above:
+Six rules this module added to the ones above:
+
+- **Some forms are a narrow column, not a 4-column grid — check the reference
+  screen.** `ProductForm` was matched to the real product's "Add new product"
+  screen, and that screen stacks its short fields in one ~492px column with the
+  image picker beside it; only the genuinely tabular blocks (inventory tracking,
+  buying, selling, bundle components) run the page's full width. The
+  [one column rhythm](#two-layout-rules-the-purchase-screenshots-corrected) rule
+  still holds _within_ a form — it is the column count that is per-screen, not
+  per-section. Three consequences worth copying:
+  - **A choice that decides whether a whole section exists is asked with no
+    default.** Product type (Single / Bundle) and Inventory tracking (Track /
+    Untrack) each gate a block, so the form holds them as UI-level tri-states
+    (`"" | …`) rather than the stored booleans. A defaulted boolean would let a
+    product be saved on a decision nobody made — and would render Inventory
+    tracking before the user has said which kind of product it applies to.
+  - **A two-word option that needs a sentence of explanation is not an
+    `MpSelect`.** Single / Bundle each carry a description line, so the control
+    is an `MpAutocomplete` with a custom option row; a native `<option>` holds
+    one line of text. `MpRadio`'s `#description` slot does the same job for
+    Track / Untrack.
+  - **Don't use `MpAccordion` for a panel that mounts already-open.**
+    `MpCollapse` measures its content on mount; a section `v-if`'d in by another
+    field mounts open and stays at `height: 0; visibility: hidden` while
+    reporting `aria-expanded="true"`. A toggle button plus `v-show` has no
+    measuring step to get wrong.
 
 - **A tab is a destination, so a breadcrumb has to be able to name one.** Six
   of the eight lists here are tabs rather than routes, so every detail page's
@@ -341,11 +366,18 @@ Five rules this module added to the ones above:
   lookup, so filling the gap later was a map entry rather than a template edit.
   A dead link is worse than no affordance, and "it will work once the next pass
   lands" is not a state to ship.
-- **Generate the children when they ARE a function of the parent.** A master's
-  variants are the cartesian product of its attributes — that is the source's
-  own model, which is why it resets the variant table whenever an attribute
-  changes. Storing them as a second list would let the two drift; deriving them
-  makes that impossible, and the form's live variant count falls out for free.
+- **Generate the children when they ARE a function of the parent — then let the
+  cells be edited.** A master's variants are the cartesian product of its
+  attributes, so the _rows_ are never authored: adding a colour to a master with
+  four sizes produces four more rows, which is why the source resets the table
+  whenever an attribute changes. What the user owns is what's _in_ a row — SKU,
+  barcode, and the two prices — and those must survive an attribute edit, so
+  each row is keyed by its option values (`variantKey`) and matched back on
+  every rebuild. Two consequences: the master has **no price field of its own**
+  (Price & stock carries accounts and taxes only, and the master's headline
+  figure is derived from the first row), and a blank cell falls back to a value
+  derived from the master rather than saving empty — with the fallback shown as
+  the field's placeholder, so it isn't a surprise after saving.
 - **A record waiting for approval is the same record, so it gets the same
   page.** Stock adjustments and warehouse transfers each have an approval queue
   whose rows carry identical fields to the committed ones. Both routes look the
@@ -367,6 +399,25 @@ Five rules this module added to the ones above:
 
 ## Changelog
 
+- **v1.6.0** — `WarehouseForm` matched to its "Add new warehouse" screenshot:
+  the same narrow field column, a capped multi-select for Person in charge
+  (`MpInputTag` with suggestions and `max-tags`, which is how a "select several,
+  up to N" field is built here), and a **Storage location** table whose rows are
+  ordered levels — the row order IS the containment order, so levels append
+  rather than insert, and the trailing picker spans the table because it is
+  wider than the Level column it would otherwise sit in.
+- **v1.5.0** — `ProductMasterForm` rebuilt against the "Add new product with
+  variant" screenshot: three named sections (Main product / Price & stock /
+  Product variant), the same narrow field column + image picker as
+  `ProductForm`, accounts-and-taxes-only bands, and an editable variant table
+  whose rows are still generated from the attributes. Master-level price and SKU
+  fields are gone — both are per variant now.
+- **v1.4.0** — `ProductForm` rebuilt against the real product's "Add new
+  product" screenshots: a narrow field column beside the image picker rather
+  than the 4-column meta grid, Product type and Inventory tracking as
+  undefaulted gating choices, rich (label + description) options pinned to the
+  trigger's width, a creatable unit/category, a Discount account on the selling
+  band, and the `MpAccordion` mount-open trap recorded above.
 - **v1.3.0** — Added Landed cost (details + form) and the
   "must balance before it saves" section: the first form here whose validity is
   a relationship between two tables rather than a property of a field. Its data
