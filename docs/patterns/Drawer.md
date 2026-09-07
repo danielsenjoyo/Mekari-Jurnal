@@ -66,7 +66,7 @@ Shape, left to right:
   list `overflow-y: auto` — that is what makes the rule between the panes run
   the drawer's full height instead of stopping under the last row.
 - **Header** = the action ("Add contact") + close button. **Intro line** under
-  it says what the picking is *for*, in one sentence.
+  it says what the picking is _for_, in one sentence.
 - **Left pane — everything pickable.** A narrowing control on top (an
   `MpSegmentedControl` over kinds of item, an `MpSelect` over a category, or
   both), a search beside it, then the heading directly above the rows it names.
@@ -74,8 +74,8 @@ Shape, left to right:
   (`Type | code`), and a check when picked — so the whole line is the hit
   target and the row's state is legible without a checkbox column.
 - **Right pane — everything picked**, with its own search, an `N selected …`
-  count with **Delete all** opposite it, and the *same row markup as the left
-  pane* so a picked thing reads identically on both sides. Clicking a row there
+  count with **Delete all** opposite it, and the _same row markup as the left
+  pane_ so a picked thing reads identically on both sides. Clicking a row there
   takes it back off — there is no separate × button. Empty, it carries the same
   flat-icon empty state
   the form's step uses (see [`BlankSlate`](./BlankSlate.md) § Empty table
@@ -92,8 +92,8 @@ Shape, left to right:
 - **The drawer edits a draft**, seeded from the form on every open and handed
   back only on `Save` — the staged rule below, for the same reasons. `Save`
   stays disabled until the draft actually differs from what the form holds.
-- **A group is a shortcut, not a scope.** A picked group stays a group *in the
-  drawer* — one row, one entry in the count — and is expanded into its members
+- **A group is a shortcut, not a scope.** A picked group stays a group _in the
+  drawer_ — one row, one entry in the count — and is expanded into its members
   on `Save`, so the form stores plain names and nothing downstream has to
   resolve a group again later. (Reopening therefore shows those members
   individually: the saved rule no longer knows which group they came from.)
@@ -160,6 +160,6 @@ thing rather than a form in a panel:
 - **That gotcha bites the whole running app, not just the new component.**
   `MpSegmentedControl`'s first use (the picker drawer above) left the dev
   server serving a stylesheet with no recipe CSS at all — the segmented control
-  rendered as bare radios, and every checkbox and tab set *already in the app*
+  rendered as bare radios, and every checkbox and tab set _already in the app_
   lost its styling too. Nothing is wrong with the code; **restart the dev
   server** and check again before rewriting a component that looks broken.

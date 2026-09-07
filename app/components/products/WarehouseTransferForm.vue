@@ -477,7 +477,6 @@ const destinationOptions = computed(() =>
   WAREHOUSE_OPTIONS.filter((option) => option !== form.fromWarehouse)
 );
 
-
 /** Only products the source warehouse actually holds can be moved out of it,
  *  and only ones not already on the sheet. */
 const productOptions = computed(() => {
@@ -599,7 +598,8 @@ function allocationsOf(line: TransferLine, mode: "store" | "pick"): LocationAllo
  *  be settled while the other is still open. */
 function locationLabel(line: TransferLine, mode: "store" | "pick"): string {
   const count = allocationsOf(line, mode).length;
-  if (count) return `${mode === "pick" ? "From" : "To"}: ${count} location${count === 1 ? "" : "s"}`;
+  if (count)
+    return `${mode === "pick" ? "From" : "To"}: ${count} location${count === 1 ? "" : "s"}`;
   return mode === "pick" ? "Pick from location" : "Set location";
 }
 

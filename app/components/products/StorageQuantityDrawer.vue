@@ -170,11 +170,7 @@
       <MpDrawerFooter>
         <div :class="footerClass">
           <MpButton variant="ghost" @click="emit('close')">Cancel</MpButton>
-          <MpButton
-            variant="primary"
-            :is-disabled="!storableLocations.length"
-            @click="onDone"
-          >
+          <MpButton variant="primary" :is-disabled="!storableLocations.length" @click="onDone">
             Done
           </MpButton>
         </div>

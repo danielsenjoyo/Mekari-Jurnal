@@ -1,6 +1,6 @@
 # Storage locations
 
-> How the Products module tracks *where inside a warehouse* stock sits.
+> How the Products module tracks _where inside a warehouse_ stock sits.
 > Cloned from jurnal-frontend-app's `src/scm/pages/warehouse/*`.
 > See also [`patterns/Drawer.md`](./patterns/Drawer.md), [`patterns/form-page-format.md`](./patterns/form-page-format.md).
 
@@ -8,11 +8,11 @@ A warehouse can be one undivided space, or it can be divided into named places �
 Rak A / Baris 1 / Bin 2. The second is what this feature is. It is three screens
 and one switch, and they only make sense together:
 
-| Screen | Route | What it decides |
-| --- | --- | --- |
-| Warehouse settings | `/products/warehouse/settings` | Whether the company uses locations at all, and the way into the type list |
-| Location type management | `/products/warehouse/location-types` | The words a warehouse may call a level: Area, Rack, Bin |
-| Set location / Pick from location | a drawer over the movement forms | Which locations a movement's quantity goes to, or comes from |
+| Screen                            | Route                                | What it decides                                                           |
+| --------------------------------- | ------------------------------------ | ------------------------------------------------------------------------- |
+| Warehouse settings                | `/products/warehouse/settings`       | Whether the company uses locations at all, and the way into the type list |
+| Location type management          | `/products/warehouse/location-types` | The words a warehouse may call a level: Area, Rack, Bin                   |
+| Set location / Pick from location | a drawer over the movement forms     | Which locations a movement's quantity goes to, or comes from              |
 
 ## The model
 
@@ -21,12 +21,12 @@ Four pieces in [`app/data/products.ts`](../app/data/products.ts):
 - **`LocationType`** — a tenant-wide name (`Area`, `Rack`, `Bin`), capped at
   `MAX_LOCATION_TYPES` (20). Names are the identity: a second "Rack" would make
   the warehouse form's picker ambiguous, so `isLocationTypeNameTaken` guards it.
-- **`Warehouse.storageLevels`** — the levels *this* warehouse has, in order,
+- **`Warehouse.storageLevels`** — the levels _this_ warehouse has, in order,
   each naming one of those types and saying whether stock may be stored **at**
   that level (`isStoringPreference`). Level 1 contains level 2 contains level 3.
 - **`StorageLocation`** — a place, nested by `parentId`, sitting at `level`.
   `getStorableLocations(warehouseId)` returns only the ones at a storing level:
-  offering a Rack *and* the Bins inside it would let the same goods be counted
+  offering a Rack _and_ the Bins inside it would let the same goods be counted
   twice.
 - **`StorageStock`** — what one location holds of one product; the figure the
   pick list shows and the put-away adds to.
@@ -61,7 +61,7 @@ the title, the stock column and the "Pick all" shortcut differ:
 - **One row per location.** Two rows against the same shelf are two halves of a
   number nobody can read at a glance.
 - **Pick mode also validates against the shelf** ("Qty exceeds stock") and
-  offers **Pick all**, which fills the *shortfall* capped by what the location
+  offers **Pick all**, which fills the _shortfall_ capped by what the location
   holds — not the whole shelf.
 - **Changing the line's quantity clears its allocation.** The split was made to
   add up to the old number; leaving it would show a settled line that isn't.
@@ -77,7 +77,7 @@ the title, the stock column and the "Pick all" shortcut differ:
   under the warehouse form's level table. The form's "enter to add" creates a
   real type, so it appears on that screen too.
 - **The drawer** — the Location column on the stock-adjustment and
-  warehouse-transfer forms, which appears only when the feature is on *and* the
+  warehouse-transfer forms, which appears only when the feature is on _and_ the
   warehouse in question has a storable location.
 
 ## Not ported

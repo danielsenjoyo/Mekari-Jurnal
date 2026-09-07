@@ -101,87 +101,89 @@
            The whole section belongs to the storage-location feature, so it is
            absent while that is switched off (Warehouse settings). -->
       <template v-if="showStorage">
-        <MpText weight="semiBold" color="dark" :class="sectionHeadingClass">Storage location</MpText>
+        <MpText weight="semiBold" color="dark" :class="sectionHeadingClass"
+          >Storage location</MpText
+        >
         <MpText size="body-small" color="gray.600" :class="sectionCaptionClass">
           In this section, you can sort locations from the most general to the most specific.
           Example: Area is the broader and bin is the most specific.
         </MpText>
 
         <MpTableContainer>
-        <MpTable :class="levelTableClass">
-          <colgroup>
-            <col v-for="(w, i) in levelColWidths" :key="i" :style="{ width: w }" />
-          </colgroup>
-          <MpTableHead is-fixed :class="tableHeadClass">
-            <MpTableRow>
-              <MpTableCell as="th">Level</MpTableCell>
-              <MpTableCell as="th">
-                <div :class="headerWithIconClass">
-                  Location type
-                  <MpTooltip
-                    placement="top"
-                    use-portal
-                    label="What you call this level of storage here — Area, Rack, Bin, and so on."
-                  >
-                    <MpIcon name="info" size="sm" />
-                  </MpTooltip>
-                </div>
-              </MpTableCell>
-              <MpTableCell as="th">Storing preference</MpTableCell>
-              <MpTableCell as="th" />
-            </MpTableRow>
-          </MpTableHead>
-          <MpTableBody>
-            <MpTableRow
-              v-for="(level, index) in form.storageLevels"
-              :key="`${level.type}-${index}`"
-            >
-              <MpTableCell as="td">Level {{ index + 1 }}</MpTableCell>
-              <MpTableCell as="td">{{ level.type }}</MpTableCell>
-              <MpTableCell as="td">
-                <MpCheckbox
-                  :id="`warehouse-level-storing-${index}`"
-                  :is-checked="level.isStoringPreference"
-                  :aria-label="`Store products at ${level.type} level`"
-                  @change="level.isStoringPreference = !level.isStoringPreference"
-                />
-              </MpTableCell>
-              <MpTableCell as="td" :class="rowActionClass">
-                <MpButton
-                  variant="ghost"
-                  size="sm"
-                  left-icon="minus-circular"
-                  :aria-label="`Remove ${level.type}`"
-                  @click="removeLevel(index)"
-                />
-              </MpTableCell>
-            </MpTableRow>
+          <MpTable :class="levelTableClass">
+            <colgroup>
+              <col v-for="(w, i) in levelColWidths" :key="i" :style="{ width: w }" />
+            </colgroup>
+            <MpTableHead is-fixed :class="tableHeadClass">
+              <MpTableRow>
+                <MpTableCell as="th">Level</MpTableCell>
+                <MpTableCell as="th">
+                  <div :class="headerWithIconClass">
+                    Location type
+                    <MpTooltip
+                      placement="top"
+                      use-portal
+                      label="What you call this level of storage here — Area, Rack, Bin, and so on."
+                    >
+                      <MpIcon name="info" size="sm" />
+                    </MpTooltip>
+                  </div>
+                </MpTableCell>
+                <MpTableCell as="th">Storing preference</MpTableCell>
+                <MpTableCell as="th" />
+              </MpTableRow>
+            </MpTableHead>
+            <MpTableBody>
+              <MpTableRow
+                v-for="(level, index) in form.storageLevels"
+                :key="`${level.type}-${index}`"
+              >
+                <MpTableCell as="td">Level {{ index + 1 }}</MpTableCell>
+                <MpTableCell as="td">{{ level.type }}</MpTableCell>
+                <MpTableCell as="td">
+                  <MpCheckbox
+                    :id="`warehouse-level-storing-${index}`"
+                    :is-checked="level.isStoringPreference"
+                    :aria-label="`Store products at ${level.type} level`"
+                    @change="level.isStoringPreference = !level.isStoringPreference"
+                  />
+                </MpTableCell>
+                <MpTableCell as="td" :class="rowActionClass">
+                  <MpButton
+                    variant="ghost"
+                    size="sm"
+                    left-icon="minus-circular"
+                    :aria-label="`Remove ${level.type}`"
+                    @click="removeLevel(index)"
+                  />
+                </MpTableCell>
+              </MpTableRow>
 
-            <!-- Trailing placeholder row = the add affordance. It spans the
+              <!-- Trailing placeholder row = the add affordance. It spans the
                  table because the picker is wider than the Level column it
                  would otherwise sit in. -->
-            <MpTableRow>
-              <MpTableCell as="td" :colspan="levelColWidths.length">
-                <div :class="levelPickerClass">
-                  <MpAutocomplete
-                    id="warehouse-form-level"
-                    :model-value="''"
-                    :data="levelTypeOptions"
-                    placeholder="Select or enter to add"
-                    empty-text="No type matches. Add it below."
-                    is-searchable
-                    is-full-width
-                    is-show-button-action
-                    use-portal
-                    @update:model-value="addLevel"
-                    @button-action="onCreateLevelType"
-                    @enter="onCreateLevelType"
-                  >
-                    <template #buttonAction>Add a new location type</template>
-                  </MpAutocomplete>
-                </div>
-              </MpTableCell>
-            </MpTableRow>
+              <MpTableRow>
+                <MpTableCell as="td" :colspan="levelColWidths.length">
+                  <div :class="levelPickerClass">
+                    <MpAutocomplete
+                      id="warehouse-form-level"
+                      :model-value="''"
+                      :data="levelTypeOptions"
+                      placeholder="Select or enter to add"
+                      empty-text="No type matches. Add it below."
+                      is-searchable
+                      is-full-width
+                      is-show-button-action
+                      use-portal
+                      @update:model-value="addLevel"
+                      @button-action="onCreateLevelType"
+                      @enter="onCreateLevelType"
+                    >
+                      <template #buttonAction>Add a new location type</template>
+                    </MpAutocomplete>
+                  </div>
+                </MpTableCell>
+              </MpTableRow>
             </MpTableBody>
           </MpTable>
         </MpTableContainer>

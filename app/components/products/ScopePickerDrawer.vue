@@ -451,7 +451,12 @@ const selectedHeadClass = css({
 
 // Each list scrolls inside its pane, so the footer's Save and the counts above
 // stay put however long the list runs.
-const rowsClass = css({ display: "flex", flexDirection: "column", overflowY: "auto", minHeight: 0 });
+const rowsClass = css({
+  display: "flex",
+  flexDirection: "column",
+  overflowY: "auto",
+  minHeight: 0
+});
 const rowClass = css({
   display: "flex",
   alignItems: "center",

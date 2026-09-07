@@ -84,8 +84,8 @@ stay and the slate goes **inside the table body**:
 - **Take the illustration from the library; never draw one.** Pixel ships 3D
   blank-slate assets at `https://cdn.mekari.design/illustration/blank-slate/`
   and its empty-state block (`get-block general-display-empty-state`) says
-  outright: *"Do not generate new illustrations — use existing 3D-style
-  assets."* `BlankSlate` holds the two this app uses:
+  outright: _"Do not generate new illustrations — use existing 3D-style
+  assets."_ `BlankSlate` holds the two this app uses:
   - `no-data` → `NoData_PB_L_01.png` (a folder with its sheets still in it),
   - `not-found` → `NotResultFound_PB_L_01.png` (a card and a magnifier with a
     red ✕).
@@ -94,8 +94,9 @@ stay and the slate goes **inside the table body**:
   `curl -s "https://cdn.mekari.design/?prefix=illustration/blank-slate/&max-keys=1000"`
   — there are ~38, including `AccessRestricted`, `Expired`, `NoConnection` and
   `UserNotFound`. Add one to the component's map rather than to a call site.
-- **Match the illustration to the cause.** The magnifier says *your query found
-  nothing*; on a list that has simply never had a row it tells the user a search
+
+- **Match the illustration to the cause.** The magnifier says _your query found
+  nothing_; on a list that has simply never had a row it tells the user a search
   failed that they never ran. That is what `variant` is for, and on a list with
   a search box it is a computed, not a constant.
 - **Title and description are one block.** They sit at `gap: 1` inside the

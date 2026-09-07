@@ -30,11 +30,7 @@
 
         <div :class="settingRowClass">
           <MpText weight="semiBold" color="dark">Feature status</MpText>
-          <MpToggle
-            v-if="isEditing"
-            id="storage-location-feature"
-            v-model:is-checked="draftActive"
-          >
+          <MpToggle v-if="isEditing" id="storage-location-feature" v-model:is-checked="draftActive">
             {{ draftActive ? "Active" : "Inactive" }}
           </MpToggle>
           <MpBadge

@@ -21,8 +21,8 @@
     </template>
 
     <MpText color="gray.600" :class="introClass">
-      The names your warehouses use for each level of storage. A warehouse picks
-      from this list when it sets up its levels, broadest first.
+      The names your warehouses use for each level of storage. A warehouse picks from this list when
+      it sets up its levels, broadest first.
     </MpText>
 
     <BlankSlate
@@ -110,12 +110,7 @@
 
     <!-- Add / edit share one modal: the same single field, and the title is
          the only thing that differs. -->
-    <MpModal
-      id="location-type-modal"
-      :is-open="isFormOpen"
-      size="sm"
-      @close="isFormOpen = false"
-    >
+    <MpModal id="location-type-modal" :is-open="isFormOpen" size="sm" @close="isFormOpen = false">
       <MpModalOverlay />
       <MpModalContent>
         <MpModalHeader>
@@ -165,8 +160,9 @@
         </MpModalHeader>
         <MpModalBody>
           <MpText size="body" color="gray.700">
-            Warehouses set up after this will no longer be able to name a level
-            "{{ pendingDelete?.name }}".
+            Warehouses set up after this will no longer be able to name a level "{{
+              pendingDelete?.name
+            }}".
           </MpText>
         </MpModalBody>
         <MpModalFooter>

@@ -2823,7 +2823,9 @@ export function getStorageLocationById(id: number): StorageLocation | undefined 
 /** Every location in a warehouse, deepest-last, so a picker can show a parent
  *  before the things inside it. */
 export function getStorageLocationTree(warehouseId: number): StorageLocation[] {
-  return getStorageLocations(warehouseId).slice().sort((a, b) => a.level - b.level);
+  return getStorageLocations(warehouseId)
+    .slice()
+    .sort((a, b) => a.level - b.level);
 }
 
 /** "Rak A / Baris 1 / Bin 2" — a location named by its whole path, which is the
@@ -2910,9 +2912,7 @@ export function getLocationTypeById(id: number): LocationType | undefined {
  *  form's picker ambiguous — so this is what the form validates against. */
 export function isLocationTypeNameTaken(name: string, exceptId?: number): boolean {
   const wanted = name.trim().toLowerCase();
-  return LOCATION_TYPES.some(
-    (type) => type.id !== exceptId && type.name.toLowerCase() === wanted
-  );
+  return LOCATION_TYPES.some((type) => type.id !== exceptId && type.name.toLowerCase() === wanted);
 }
 
 /**
@@ -2985,9 +2985,8 @@ const STORAGE_STOCK: StorageStock[] = [
 /** What a location holds of a product — 0 for a location it has never held. */
 export function getLocationStock(locationId: number, productId: number): number {
   return (
-    STORAGE_STOCK.find(
-      (entry) => entry.locationId === locationId && entry.productId === productId
-    )?.quantity ?? 0
+    STORAGE_STOCK.find((entry) => entry.locationId === locationId && entry.productId === productId)
+      ?.quantity ?? 0
   );
 }
 

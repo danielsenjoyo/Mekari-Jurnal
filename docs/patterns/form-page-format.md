@@ -321,7 +321,7 @@ is `""` for exactly that reason.
 | `/products/convert/new` + `convert/[id]`    | **form**  | `ProductConversionForm` — lines come from the bundle, not a picker  |
 | `/products/price-rules/new` + `edit/[id]`   | **form**  | `PriceRuleForm` — field set driven by `PRICE_RULE_SHAPE`            |
 | `/products/warehouse/[id]`                  | details   | Products held, storage locations (drawer), movements                |
-| `/products/warehouse/new` + `edit/[id]`     | **form**  | `WarehouseForm` — narrow column + an ordered storage-level table     |
+| `/products/warehouse/new` + `edit/[id]`     | **form**  | `WarehouseForm` — narrow column + an ordered storage-level table    |
 | `/products/stock-adjustment/[id]`           | details   | Also serves the approval queue — see below                          |
 | `/products/stock-adjustment/new` + `edit`   | **form**  | `StockAdjustmentForm` — `?type=` presets the adjustment type        |
 | `/products/warehouse-transfer/[id]`         | details   | Also serves the approval queue; Clone opens the form pre-filled     |
@@ -368,9 +368,9 @@ Six rules this module added to the ones above:
   lands" is not a state to ship.
 - **Generate the children when they ARE a function of the parent — then let the
   cells be edited.** A master's variants are the cartesian product of its
-  attributes, so the *rows* are never authored: adding a colour to a master with
+  attributes, so the _rows_ are never authored: adding a colour to a master with
   four sizes produces four more rows, which is why the source resets the table
-  whenever an attribute changes. What the user owns is what's *in* a row — SKU,
+  whenever an attribute changes. What the user owns is what's _in_ a row — SKU,
   barcode, and the two prices — and those must survive an attribute edit, so
   each row is keyed by its option values (`variantKey`) and matched back on
   every rebuild. Two consequences: the master has **no price field of its own**
