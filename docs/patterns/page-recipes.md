@@ -128,7 +128,7 @@ wrapping element.
 | [`BulkActionBar`](./BulkActionBar.md)             | Header swap while rows are selected.             |
 | [`Pagination`](./Pagination.md)                   | Rows-per-page + page-jump footer.                |
 | [`StatusBadge`](./StatusBadge.md)                 | Domain status → `MpBadge type`.                  |
-| [`BlankSlate`](./BlankSlate.md)                   | Adaptive search-not-found empty state.           |
+| [`BlankSlate`](./BlankSlate.md)                   | Empty state: empty table, empty section, record not found. |
 | [`Form`](./Form.md)                               | `MpFormControl`-wrapped fields.                  |
 | [`Modal`](./Modal.md)                             | Centred confirm / focused dialog.                |
 | [`index-page-format`](./index-page-format.md)     | Index-page zone composition.                     |

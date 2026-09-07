@@ -227,7 +227,9 @@
                form's unit price. -->
           <div :class="shippingFeeInputClass" @focusout="onShippingFeeBlur">
             <MpInputGroup>
-              <MpInputLeftAddon>Rp</MpInputLeftAddon>
+              <MpInputLeftAddon>
+                <MpText weight="semiBold" :class="addonTextClass">Rp</MpText>
+              </MpInputLeftAddon>
               <MpInput
                 v-model="shippingFeeText"
                 type="text"
@@ -540,6 +542,10 @@ function onCancel() {
 }
 
 // All css() below uses Pixel 3 token shortcuts only (token mode 2.1).
+// The addon supplies no padding of its own: Pixel's "input with prefix and
+// suffix" pattern (docs.mekari.design/patterns/input.html) pads the addon's
+// content by 12px, without which the prefix sits flush against both edges.
+const addonTextClass = css({ px: 3 });
 const typeSelectClass = css({ width: "200px" });
 const topGridClass = css({
   display: "grid",

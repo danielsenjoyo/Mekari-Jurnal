@@ -256,15 +256,17 @@ and it must get the **same treatment as the list page's search-empty state** —
 illustration, title, one line of recovery copy, and an action back to the list:
 
 ```vue
-<div v-if="!record" :class="notFoundClass">
-  <img src="/illustrations/search-not-found.png" alt="" :class="notFoundIllustrationClass" />
-  <MpText weight="semiBold" color="dark" :class="notFoundTitleClass">Invoice not found</MpText>
-  <MpText size="body-small" color="gray.600" :class="notFoundDescClass">
-    This invoice may have been deleted, or the link you followed may be out of date.
-  </MpText>
+<BlankSlate
+  v-if="!record"
+  title="Invoice not found"
+  description="This invoice may have been deleted, or the link you followed may be out of date."
+>
   <MpButton variant="secondary" @click="navigateTo('/purchase')">Back to Purchases</MpButton>
-</div>
+</BlankSlate>
 ```
+
+`variant` defaults to `not-found`, which is right here — the record was asked
+for and isn't there. See [`BlankSlate`](./BlankSlate.md).
 
 Two rules the Purchase audit had to correct here:
 

@@ -31,18 +31,15 @@
       </MpTooltip>
     </template>
 
-    <div v-if="!master" :class="notFoundClass">
-      <img src="/illustrations/search-not-found.png" alt="" :class="notFoundIllustrationClass" />
-      <MpText weight="semiBold" color="dark" :class="notFoundTitleClass">
-        Product with variant not found
-      </MpText>
-      <MpText size="body-small" color="gray.600" :class="notFoundDescClass">
-        This product may have been deleted, or the link you followed may be out of date.
-      </MpText>
+    <BlankSlate
+      v-if="!master"
+      title="Product with variant not found"
+      description="This product may have been deleted, or the link you followed may be out of date."
+    >
       <MpButton variant="secondary" @click="navigateTo('/products?tab=masters')">
         Back to Product with variant list
       </MpButton>
-    </div>
+    </BlankSlate>
 
     <template v-else>
       <div :class="topRowClass">
@@ -451,7 +448,7 @@ const descriptionValueClass = css({ whiteSpace: "normal", wordBreak: "break-word
 const tradeRowClass = css({ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 });
 const tradeColClass = css({ display: "flex", flexDirection: "column", gap: 4, minWidth: "0" });
 
-const relatedSectionClass = css({ mt: 10 });
+const relatedSectionClass = css({ mt: 8 });
 const relatedCaptionClass = css({ display: "block", mt: 3 });
 // Eight columns don't fit a narrow stage; min-width makes the container scroll
 // rather than wrapping every cell (docs/patterns/TablePage.md).
@@ -477,18 +474,6 @@ const scrollShadowClass = css({
 });
 
 const bulletListClass = css({ pl: 5, mt: 2, listStyleType: "disc" });
-
-const notFoundClass = css({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 3,
-  py: 16,
-  textAlign: "center"
-});
-const notFoundTitleClass = css({ fontSize: "lg" });
-const notFoundIllustrationClass = css({ width: "180px", height: "auto", mb: 1 });
-const notFoundDescClass = css({ maxWidth: "320px" });
 
 const modalTitleClass = css({ fontSize: "lg" });
 const modalFooterClass = css({ display: "flex", justifyContent: "flex-end", gap: 2 });

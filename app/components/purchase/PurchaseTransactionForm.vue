@@ -302,7 +302,9 @@
                    type="number". -->
               <div @focusout="onPriceBlur(line)">
                 <MpInputGroup>
-                  <MpInputLeftAddon>Rp</MpInputLeftAddon>
+                  <MpInputLeftAddon>
+                    <MpText weight="semiBold" :class="addonTextClass">Rp</MpText>
+                  </MpInputLeftAddon>
                   <MpInput
                     v-model="line.unitPriceText"
                     type="text"
@@ -315,7 +317,9 @@
             </MpTableCell>
             <MpTableCell as="td" :class="lineCellClass">
               <MpInputGroup>
-                <MpInputLeftAddon>%</MpInputLeftAddon>
+                <MpInputLeftAddon>
+                  <MpText weight="semiBold" :class="addonTextClass">%</MpText>
+                </MpInputLeftAddon>
                 <MpInput
                   v-model.number="line.discountPercent"
                   type="number"
@@ -335,7 +339,9 @@
               <!-- Amount is computed, but still rendered as a (read-only)
                    Rp-addon field so the column lines up with Unit price. -->
               <MpInputGroup>
-                <MpInputLeftAddon>Rp</MpInputLeftAddon>
+                <MpInputLeftAddon>
+                  <MpText weight="semiBold" :class="addonTextClass">Rp</MpText>
+                </MpInputLeftAddon>
                 <MpInput
                   :model-value="formatAmount(computeLineAmount(line))"
                   :class="numInputClass"
@@ -493,7 +499,9 @@
           >
             <div :class="discountInputClass">
               <MpInputGroup>
-                <MpInputLeftAddon>%</MpInputLeftAddon>
+                <MpInputLeftAddon>
+                  <MpText weight="semiBold" :class="addonTextClass">%</MpText>
+                </MpInputLeftAddon>
                 <MpInput v-model.number="withholdingPercent" type="number" :class="numInputClass" />
               </MpInputGroup>
             </div>
@@ -1062,6 +1070,10 @@ function onCancel() {
 }
 
 // All css() below uses Pixel 3 token shortcuts only (token mode 2.1).
+// The addon supplies no padding of its own: Pixel's "input with prefix and
+// suffix" pattern (docs.mekari.design/patterns/input.html) pads the addon's
+// content by 12px, without which the prefix sits flush against both edges.
+const addonTextClass = css({ px: 3 });
 const typeSelectClass = css({ width: "200px" });
 
 const topGridClass = css({

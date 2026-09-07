@@ -33,14 +33,13 @@
       </MpTooltip>
     </template>
 
-    <div v-if="!delivery" :class="notFoundClass">
-      <img src="/illustrations/search-not-found.png" alt="" :class="notFoundIllustrationClass" />
-      <MpText weight="semiBold" color="dark" :class="notFoundTitleClass">Delivery not found</MpText>
-      <MpText size="body-small" color="gray.600" :class="notFoundDescClass">
-        This delivery may have been deleted, or the link you followed may be out of date.
-      </MpText>
+    <BlankSlate
+      v-if="!delivery"
+      title="Delivery not found"
+      description="This delivery may have been deleted, or the link you followed may be out of date."
+    >
       <MpButton variant="secondary" @click="navigateTo('/purchase')">Back to Purchases</MpButton>
-    </div>
+    </BlankSlate>
 
     <template v-else>
       <!-- Zone A — vendor / email. No balance-due block: a delivery is a
@@ -414,18 +413,6 @@ const wrapInlineClass = css({
 });
 
 const lastUpdatedClass = css({ display: "block", mt: 6, fontSize: "sm" });
-
-const notFoundClass = css({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 3,
-  py: 16,
-  textAlign: "center"
-});
-const notFoundTitleClass = css({ fontSize: "lg" });
-const notFoundIllustrationClass = css({ width: "180px", height: "auto", mb: 1 });
-const notFoundDescClass = css({ maxWidth: "320px" });
 
 const modalTitleClass = css({ fontSize: "lg" });
 const modalFooterClass = css({ display: "flex", justifyContent: "flex-end", gap: 2 });

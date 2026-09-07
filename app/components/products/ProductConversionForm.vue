@@ -8,17 +8,13 @@
          source reaches this screen only from a product's own Actions menu
          (passing the id in the query). Landing here without one is a broken
          link, so it gets the same treatment as any other not-found. -->
-    <div v-if="!source" :class="notFoundClass">
-      <img src="/illustrations/search-not-found.png" alt="" :class="notFoundIllustrationClass" />
-      <MpText weight="semiBold" color="dark" :class="notFoundTitleClass">
-        No product to convert
-      </MpText>
-      <MpText size="body-small" color="gray.600" :class="notFoundDescClass">
-        Start a conversion from a bundle product's Actions menu, so the components to produce are
-        known.
-      </MpText>
+    <BlankSlate
+      v-if="!source"
+      title="No product to convert"
+      description="Start a conversion from a bundle product's Actions menu, so the components to produce are known."
+    >
       <MpButton variant="secondary" @click="navigateTo('/products')">Back to Product list</MpButton>
-    </div>
+    </BlankSlate>
 
     <template v-else>
       <MpBanner
@@ -164,7 +160,9 @@
               <MpTableCell as="td">
                 <div @focusout="onCostBlur(index)">
                   <MpInputGroup>
-                    <MpInputLeftAddon>Rp</MpInputLeftAddon>
+                    <MpInputLeftAddon>
+                      <MpText weight="semiBold" :class="addonTextClass">Rp</MpText>
+                    </MpInputLeftAddon>
                     <MpInput
                       v-model="costText[index]"
                       type="text"
@@ -377,6 +375,10 @@ function onSubmit() {
 }
 
 // All css() below uses Pixel 3 token shortcuts only (token mode 2.1).
+// The addon supplies no padding of its own: Pixel's "input with prefix and
+// suffix" pattern (docs.mekari.design/patterns/input.html) pads the addon's
+// content by 12px, without which the prefix sits flush against both edges.
+const addonTextClass = css({ px: 3 });
 const bannerClass = css({ mb: 6 });
 const gridClass = css({
   display: "grid",
@@ -426,21 +428,9 @@ const actionRowClass = css({
   justifyContent: "flex-end",
   alignItems: "center",
   gap: 2,
-  mt: 10,
+  mt: 8,
   pt: 6,
   borderTopWidth: "sm",
   borderColor: "gray.100"
 });
-
-const notFoundClass = css({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 3,
-  py: 16,
-  textAlign: "center"
-});
-const notFoundTitleClass = css({ fontSize: "lg" });
-const notFoundIllustrationClass = css({ width: "180px", height: "auto", mb: 1 });
-const notFoundDescClass = css({ maxWidth: "320px" });
 </script>

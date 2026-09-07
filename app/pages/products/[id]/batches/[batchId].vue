@@ -8,14 +8,13 @@
       <MpBadge for="additionalInformation" type="announcement">Archived</MpBadge>
     </template>
 
-    <div v-if="!batch || !product" :class="notFoundClass">
-      <img src="/illustrations/search-not-found.png" alt="" :class="notFoundIllustrationClass" />
-      <MpText weight="semiBold" color="dark" :class="notFoundTitleClass">Batch not found</MpText>
-      <MpText size="body-small" color="gray.600" :class="notFoundDescClass">
-        This batch may have been deleted, or the link you followed may be out of date.
-      </MpText>
+    <BlankSlate
+      v-if="!batch || !product"
+      title="Batch not found"
+      description="This batch may have been deleted, or the link you followed may be out of date."
+    >
       <MpButton variant="secondary" @click="navigateTo('/products')">Back to Product list</MpButton>
-    </div>
+    </BlankSlate>
 
     <template v-else>
       <!-- Zone A. A batch's headline figure is its own stock, not the
@@ -258,7 +257,7 @@ const descriptionFieldClass = css({
 });
 const descriptionValueClass = css({ whiteSpace: "normal", wordBreak: "break-word" });
 
-const relatedSectionClass = css({ mt: 10 });
+const relatedSectionClass = css({ mt: 8 });
 const relatedBodyClass = css({ pt: 4 });
 const relatedTableClass = css({ tableLayout: "auto", width: "full", minWidth: "720px" });
 const tableHeadClass = css({ boxShadow: "0 1px 0 0 var(--mp-colors-gray-100)!" });
@@ -278,18 +277,6 @@ const scrollShadowClass = css({
   backgroundSize: "36px 100%, 36px 100%, 12px 100%, 12px 100%",
   backgroundAttachment: "local, local, scroll, scroll"
 });
-
-const notFoundClass = css({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 3,
-  py: 16,
-  textAlign: "center"
-});
-const notFoundTitleClass = css({ fontSize: "lg" });
-const notFoundIllustrationClass = css({ width: "180px", height: "auto", mb: 1 });
-const notFoundDescClass = css({ maxWidth: "320px" });
 
 const bottomActionsClass = css({
   display: "flex",

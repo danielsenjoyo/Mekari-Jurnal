@@ -7,15 +7,31 @@
          menu reading as a flat list, and the grouping is how a user finds
          "Transfer warehouse" without knowing it is a warehouse action. -->
     <template #actions>
+      <!-- Only on the Warehouses segment: the settings behind it (the storage
+           location switch, the location types) are warehouse settings, and on
+           the other two segments they would be a button about somewhere else. -->
+      <MpButton
+        v-if="activeSegmentKey === 'warehouses'"
+        variant="secondary"
+        @click="navigateTo('/products/warehouse/settings')"
+      >
+        Warehouse settings
+      </MpButton>
       <MpButton variant="secondary" @click="onAction('import')">Import</MpButton>
-      <MpPopover placement="bottom-end" use-portal is-adaptive-width>
+      <!-- `is-close-on-select`: one of these entries opens a drawer rather
+           than navigating, and a menu left standing over it covers the thing
+           it just opened. -->
+      <MpPopover placement="bottom-end" use-portal is-adaptive-width is-close-on-select>
         <template #default>
           <MpPopoverTrigger>
             <MpButton variant="primary" right-icon="caret-down">Actions</MpButton>
           </MpPopoverTrigger>
           <MpPopoverContent>
-            <template v-for="group in ACTION_GROUPS" :key="group.title">
-              <MpText as="p" size="label" color="gray.600" :class="menuSectionClass">
+            <template v-for="(group, index) in ACTION_GROUPS" :key="group.title">
+              <!-- A rule between groups, never above the first: the heading
+                   alone doesn't separate nine entries into three decisions. -->
+              <MpDivider v-if="index > 0" :class="menuDividerClass" />
+              <MpText as="p" size="overline" color="gray.600" :class="menuSectionClass">
                 {{ group.title }}
               </MpText>
               <MpPopoverList>
@@ -483,19 +499,20 @@
       </div>
     </template>
 
-    <div v-else :class="emptyStateClass">
-      <img src="/illustrations/search-not-found.png" alt="" :class="emptyIllustrationClass" />
-      <MpText weight="semiBold" color="dark" :class="emptyTitleClass">{{ emptyTitle }}</MpText>
-      <MpText size="body-small" color="gray.600" :class="emptyDescClass">
-        {{ emptyDescription }}
-      </MpText>
+    <BlankSlate v-else :variant="emptyVariant" :title="emptyTitle" :description="emptyDescription">
       <!-- The filter lives in a staged drawer, so an empty list has no visible
            cause once it is shut — the slate has to offer the way out.
            docs/patterns/BlankSlate.md. -->
       <MpButton v-if="hasActiveFilter" variant="secondary" @click="resetFilters">
         Clear filters
       </MpButton>
-    </div>
+    </BlankSlate>
+
+    <StorageLocationDrawer
+      :is-open="isStorageDrawerOpen"
+      @close="isStorageDrawerOpen = false"
+      @created="onStorageLocationCreated"
+    />
   </DefaultPageContent>
 </template>
 
@@ -505,6 +522,7 @@ import {
   css,
   MpAutocomplete,
   MpBadge,
+  MpDivider,
   MpButton,
   MpCheckbox,
   MpIcon,
@@ -575,6 +593,7 @@ import {
   getWarehouseApprovals,
   getWarehouseTransfers,
   getWarehouses,
+  isStorageLocationFeatureActive,
   ACTIVE_STATUS_LABEL,
   ACTIVE_STATUS_TYPE,
   priceRuleScopeSummary,
@@ -629,11 +648,16 @@ const TABS_BY_SEGMENT: Record<SegmentKey, { key: ProductsTabKey; label: string }
   price_rules: [{ key: "price_rules", label: "Price rules" }]
 };
 
-// The title-band menu, grouped exactly as the source groups it. Section
-// headings are the source's own (rendered there as letter-spaced capitals;
-// here as a label-sized caption above each list, which is the sanctioned
-// Pixel popover-section pattern).
-const ACTION_GROUPS: { title: string; items: { key: string; label: string }[] }[] = [
+/**
+ * The title-band menu, grouped exactly as the source groups it: letter-spaced
+ * capitals over each list and a rule between groups.
+ *
+ * There is no "New stock in/out" entry. Both stock movements are one screen,
+ * and since that screen now opens on a Prepare step whose first question is
+ * the adjustment type, a second menu entry would only pre-answer a question
+ * the user is about to be asked anyway.
+ */
+const ACTION_GROUPS = computed<{ title: string; items: { key: string; label: string }[] }[]>(() => [
   {
     title: "Product",
     items: [
@@ -645,9 +669,12 @@ const ACTION_GROUPS: { title: string; items: { key: string; label: string }[] }[
     title: "Warehouse",
     items: [
       { key: "create-warehouse", label: "Add new warehouse" },
-      { key: "add-storage", label: "Add new storage location" },
+      // Hidden while the storage-location feature is off: with no locations
+      // anywhere, the entry leads to a drawer that can't save anything.
+      ...(isStorageLocationFeatureActive()
+        ? [{ key: "add-storage", label: "Add new storage location" }]
+        : []),
       { key: "stock-count", label: "Adjust stock (stock opname)" },
-      { key: "stock-in-out", label: "New stock in/out" },
       { key: "warehouse-transfer", label: "Transfer warehouse" }
     ]
   },
@@ -655,7 +682,7 @@ const ACTION_GROUPS: { title: string; items: { key: string; label: string }[] }[
     title: "Price rule",
     items: [{ key: "create-price-rule", label: "Create new price rule" }]
   }
-];
+]);
 
 type ColumnKey =
   | "productName"
@@ -951,9 +978,11 @@ function rowsForTab(tab: ProductsTabKey): Row[] {
         title: w.name,
         code: w.code,
         address: w.address,
-        pic: w.pic,
+        // Several people can share a warehouse; the column shows them as one
+        // line, which is what a list column can carry.
+        pic: w.pics.join(", "),
         description: w.description,
-        searchText: [w.code, w.name, w.address, w.pic, w.description],
+        searchText: [w.code, w.name, w.address, ...w.pics, w.description],
         warehouse: w.name,
         status: w.isActive ? "active" : "inactive"
       }));
@@ -1402,6 +1431,12 @@ function onJumpPage(val: unknown) {
   if (!Number.isNaN(n)) page.value = n;
 }
 
+/** A list that has simply never had a row is not a failed search, and must
+ *  not borrow the magnifier illustration to say so. */
+const emptyVariant = computed(() =>
+  searchTerm.value || hasActiveFilter.value ? "not-found" : "no-data"
+);
+
 const emptyTitle = computed(() => {
   if (searchTerm.value) return `"${searchTerm.value}" not found`;
   if (hasActiveFilter.value) return "No results found";
@@ -1460,25 +1495,36 @@ function onOpen(row: Row) {
  * in/out" are one screen with its Adjustment type preset, which is exactly how
  * the source's two menu items behave.
  *
- * "Add new storage location" lands on the warehouse list rather than a form: a
- * location belongs to one warehouse, and it is added from that warehouse's own
- * page (a drawer there). The menu can't know which warehouse is meant, so it
- * takes the user to the step that does.
+ * "Add new storage location" is the exception: it has no route at all. A
+ * location is four fields, so it opens the same drawer the warehouse page
+ * uses, with the warehouse picked inside it rather than beforehand — sending
+ * the user to the warehouse list first made them find the warehouse, open it,
+ * and then do the thing they had already asked for.
  */
 const ACTION_ROUTES: Record<string, string> = {
   "create-product": "/products/new",
   "create-product-master": "/products/master/new",
   "create-warehouse": "/products/warehouse/new",
-  "add-storage": "/products?tab=warehouses",
   "stock-count": "/products/stock-adjustment/new?type=stock_count",
-  "stock-in-out": "/products/stock-adjustment/new?type=in_out",
   "warehouse-transfer": "/products/warehouse-transfer/new",
   "create-price-rule": "/products/price-rules/new"
 };
 
+const isStorageDrawerOpen = ref(false);
+
 function onAction(action: string) {
+  if (action === "add-storage") {
+    isStorageDrawerOpen.value = true;
+    return;
+  }
   const route = ACTION_ROUTES[action];
   if (route) navigateTo(route);
+}
+
+/** Land the user on the list the new location joined, so the result of the
+ *  action is on screen rather than somewhere they have to go and look. */
+function onStorageLocationCreated(location: { warehouseId: number }) {
+  navigateTo(`/products/warehouse/${location.warehouseId}?tab=locations`);
 }
 
 // ---- Archive / delete / approve -----------------------------------------
@@ -1628,7 +1674,17 @@ const tabLabelClass = css({
 // Popover section heading — the sanctioned Pixel pattern for a grouped menu
 // (see the "Title" usage in the Popover docs): a caption above each list,
 // not a disabled list item.
-const menuSectionClass = css({ pt: 3, px: 3, pb: 1 });
+// `size="overline"` supplies the type scale; the capitals and tracking are the
+// section-heading treatment the source uses, and Pixel leaves both to the
+// caller (its own overline examples are written in caps).
+const menuSectionClass = css({
+  pt: 3,
+  px: 3,
+  pb: 1,
+  textTransform: "uppercase",
+  letterSpacing: "wider"
+});
+const menuDividerClass = css({ my: 1 });
 
 const filterButtonWrapClass = css({ position: "relative", display: "inline-flex" });
 const filterDotClass = css({
@@ -1779,18 +1835,6 @@ const skeletonCheckboxClass = css({
   height: "18px",
   rounded: "sm"
 });
-
-const emptyStateClass = css({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 3,
-  py: 16,
-  textAlign: "center"
-});
-const emptyIllustrationClass = css({ width: "180px", height: "auto", mb: 1 });
-const emptyTitleClass = css({ fontSize: "lg" });
-const emptyDescClass = css({ maxWidth: "320px" });
 
 const paginationClass = css({
   display: "flex",

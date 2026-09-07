@@ -76,6 +76,6 @@ Full table + handler list: [`index-page-pattern.md` §12](../index-page-pattern.
 5. Filter drawer mirroring the filters; Apply closes, Reset clears.
 6. Table: `columns`, `colWidths` (checkbox 44px + Actions 140px fixed, middle % summing to 100%), fixed-layout + sticky-actions + 1px-header classes, the overflow `ResizeObserver`, bulk row, skeleton rows.
 7. Pagination footer.
-8. Blank slate as the `v-else` — `search-not-found` illustration + adaptive copy, no CTA.
+8. Blank slate as the `v-else` — `<BlankSlate>` with adaptive variant + copy, no CTA.
 9. Wire the state model; replace static `rows` with your data and flip `isLoading` around the fetch.
 10. `pnpm lint` + `nuxt typecheck` clean; verify in the preview.

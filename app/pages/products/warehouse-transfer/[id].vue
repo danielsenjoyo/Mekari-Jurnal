@@ -33,18 +33,15 @@
       </MpTooltip>
     </template>
 
-    <div v-if="!record" :class="notFoundClass">
-      <img src="/illustrations/search-not-found.png" alt="" :class="notFoundIllustrationClass" />
-      <MpText weight="semiBold" color="dark" :class="notFoundTitleClass">
-        Warehouse transfer not found
-      </MpText>
-      <MpText size="body-small" color="gray.600" :class="notFoundDescClass">
-        This transaction may have been deleted, or the link you followed may be out of date.
-      </MpText>
+    <BlankSlate
+      v-if="!record"
+      title="Warehouse transfer not found"
+      description="This transaction may have been deleted, or the link you followed may be out of date."
+    >
       <MpButton variant="secondary" @click="navigateTo('/products?tab=warehouse_transfers')">
         Back to Warehouse transfer list
       </MpButton>
-    </div>
+    </BlankSlate>
 
     <template v-else>
       <!-- Zone A. A transfer's identity is where it goes from and to; the
@@ -358,18 +355,6 @@ const scrollShadowClass = css({
   backgroundSize: "36px 100%, 36px 100%, 12px 100%, 12px 100%",
   backgroundAttachment: "local, local, scroll, scroll"
 });
-
-const notFoundClass = css({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 3,
-  py: 16,
-  textAlign: "center"
-});
-const notFoundTitleClass = css({ fontSize: "lg" });
-const notFoundIllustrationClass = css({ width: "180px", height: "auto", mb: 1 });
-const notFoundDescClass = css({ maxWidth: "320px" });
 
 const modalTitleClass = css({ fontSize: "lg" });
 const modalFooterClass = css({ display: "flex", justifyContent: "flex-end", gap: 2 });

@@ -33,18 +33,15 @@
       </MpTooltip>
     </template>
 
-    <div v-if="!record" :class="notFoundClass">
-      <img src="/illustrations/search-not-found.png" alt="" :class="notFoundIllustrationClass" />
-      <MpText weight="semiBold" color="dark" :class="notFoundTitleClass">
-        Stock adjustment not found
-      </MpText>
-      <MpText size="body-small" color="gray.600" :class="notFoundDescClass">
-        This transaction may have been deleted, or the link you followed may be out of date.
-      </MpText>
+    <BlankSlate
+      v-if="!record"
+      title="Stock adjustment not found"
+      description="This transaction may have been deleted, or the link you followed may be out of date."
+    >
       <MpButton variant="secondary" @click="navigateTo('/products?tab=stock_adjustments')">
         Back to Stock adjustment list
       </MpButton>
-    </div>
+    </BlankSlate>
 
     <template v-else>
       <!-- Zone A. The headline is what the adjustment is worth — the figure the
@@ -445,18 +442,6 @@ const totalsColClass = css({
 const totalsLineClass = css({ display: "flex", justifyContent: "space-between", gap: 3 });
 
 const bulletListClass = css({ pl: 5, mt: 2, listStyleType: "disc" });
-
-const notFoundClass = css({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 3,
-  py: 16,
-  textAlign: "center"
-});
-const notFoundTitleClass = css({ fontSize: "lg" });
-const notFoundIllustrationClass = css({ width: "180px", height: "auto", mb: 1 });
-const notFoundDescClass = css({ maxWidth: "320px" });
 
 const modalTitleClass = css({ fontSize: "lg" });
 const modalFooterClass = css({ display: "flex", justifyContent: "flex-end", gap: 2 });

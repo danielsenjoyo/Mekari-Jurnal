@@ -33,14 +33,13 @@
       </MpTooltip>
     </template>
 
-    <div v-if="!quote" :class="notFoundClass">
-      <img src="/illustrations/search-not-found.png" alt="" :class="notFoundIllustrationClass" />
-      <MpText weight="semiBold" color="dark" :class="notFoundTitleClass">Quote not found</MpText>
-      <MpText size="body-small" color="gray.600" :class="notFoundDescClass">
-        This quote may have been deleted, or the link you followed may be out of date.
-      </MpText>
+    <BlankSlate
+      v-if="!quote"
+      title="Quote not found"
+      description="This quote may have been deleted, or the link you followed may be out of date."
+    >
       <MpButton variant="secondary" @click="navigateTo('/purchase')">Back to Purchases</MpButton>
-    </div>
+    </BlankSlate>
 
     <template v-else>
       <!-- Zone A — vendor / email / balance due. -->
@@ -480,18 +479,6 @@ const totalsColClass = css({
 const totalsRowClass = css({ display: "flex", justifyContent: "space-between", gap: 3 });
 
 const lastUpdatedClass = css({ display: "block", mt: 6, fontSize: "sm" });
-
-const notFoundClass = css({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 3,
-  py: 16,
-  textAlign: "center"
-});
-const notFoundTitleClass = css({ fontSize: "lg" });
-const notFoundIllustrationClass = css({ width: "180px", height: "auto", mb: 1 });
-const notFoundDescClass = css({ maxWidth: "320px" });
 
 const modalTitleClass = css({ fontSize: "lg" });
 const modalFooterClass = css({ display: "flex", justifyContent: "flex-end", gap: 2 });

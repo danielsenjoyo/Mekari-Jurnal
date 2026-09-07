@@ -1,15 +1,12 @@
 <template>
-  <div :class="emptyStateClass">
-    <img src="/illustrations/search-not-found.png" alt="" :class="emptyIllustrationClass" />
-    <MpText weight="semiBold" color="dark" :class="emptyTitleClass">{{ title }}</MpText>
-    <MpText size="body-small" color="gray.600" :class="emptyDescClass">{{ description }}</MpText>
+  <BlankSlate :variant="hasRun ? 'not-found' : 'no-data'" :title="title" :description="description">
     <MpButton v-if="canClear" variant="secondary" @click="$emit('clear')">Clear filters</MpButton>
-  </div>
+  </BlankSlate>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { css, MpButton, MpText } from "@mekari/pixel3";
+import { MpButton } from "@mekari/pixel3";
 
 /**
  * A report's two empty states, in one block (`docs/patterns/BlankSlate.md`):
@@ -37,17 +34,4 @@ const description = computed(() =>
     : "Select dates or period, then click the Filter button."
 );
 const canClear = computed(() => props.hasRun && Boolean(props.isFilterActive));
-
-const emptyStateClass = css({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 3,
-  py: 16,
-  textAlign: "center"
-});
-// The illustration source is 1500×1250 (6:5); width controls the size.
-const emptyIllustrationClass = css({ width: "180px", height: "auto", mb: 1 });
-const emptyTitleClass = css({ fontSize: "lg" });
-const emptyDescClass = css({ maxWidth: "320px" });
 </script>

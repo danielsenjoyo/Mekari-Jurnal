@@ -4,16 +4,13 @@
     breadcrumb="Purchases"
     breadcrumb-to="/purchase"
   >
-    <div v-if="!record" :class="notFoundClass">
-      <img src="/illustrations/search-not-found.png" alt="" :class="notFoundIllustrationClass" />
-      <MpText weight="semiBold" color="dark" :class="notFoundTitleClass"
-        >Landed cost not found</MpText
-      >
-      <MpText size="body-small" color="gray.600" :class="notFoundDescClass">
-        This landed cost may have been deleted, or the link you followed may be out of date.
-      </MpText>
+    <BlankSlate
+      v-if="!record"
+      title="Landed cost not found"
+      description="This landed cost may have been deleted, or the link you followed may be out of date."
+    >
       <MpButton variant="secondary" @click="navigateTo('/purchase')">Back to Purchases</MpButton>
-    </div>
+    </BlankSlate>
 
     <template v-else>
       <!-- Zone A — which purchase this costs, and the headline total. -->
@@ -304,17 +301,6 @@ const bottomActionsClass = css({
   borderColor: "gray.100"
 });
 
-const notFoundClass = css({
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 3,
-  py: 16,
-  textAlign: "center"
-});
-const notFoundTitleClass = css({ fontSize: "lg" });
-const notFoundIllustrationClass = css({ width: "180px", height: "auto", mb: 1 });
-const notFoundDescClass = css({ maxWidth: "320px" });
 const modalTitleClass = css({ fontSize: "lg" });
 const modalFooterClass = css({ display: "flex", justifyContent: "flex-end", gap: 2 });
 </script>

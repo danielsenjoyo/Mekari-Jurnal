@@ -259,7 +259,9 @@
             <MpText>Discount</MpText>
             <div :class="discountInputClass">
               <MpInputGroup>
-                <MpInputLeftAddon>%</MpInputLeftAddon>
+                <MpInputLeftAddon>
+                  <MpText weight="semiBold" :class="addonTextClass">%</MpText>
+                </MpInputLeftAddon>
                 <MpInput v-model.number="discountValue" type="number" :class="numInputClass" />
               </MpInputGroup>
             </div>
@@ -679,6 +681,10 @@ function onCancel() {
 }
 
 // All css() below uses Pixel 3 token shortcuts only (token mode 2.1).
+// The addon supplies no padding of its own: Pixel's "input with prefix and
+// suffix" pattern (docs.mekari.design/patterns/input.html) pads the addon's
+// content by 12px, without which the prefix sits flush against both edges.
+const addonTextClass = css({ px: 3 });
 const topGridClass = css({
   display: "grid",
   gridTemplateColumns: "repeat(4, 1fr)",
