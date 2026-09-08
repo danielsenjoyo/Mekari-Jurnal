@@ -60,7 +60,7 @@
             <MpFormLabel>Account</MpFormLabel>
             <MpSelect v-model="form.account" is-full-width>
               <option value="">Select account</option>
-              <option v-for="option in ACCOUNT_OPTIONS" :key="option" :value="option">
+              <option v-for="option in ADJUSTMENT_ACCOUNT_OPTIONS" :key="option" :value="option">
                 {{ option }}
               </option>
             </MpSelect>
@@ -165,7 +165,7 @@
             <MpFormLabel>Account</MpFormLabel>
             <MpSelect v-model="form.account" is-full-width>
               <option value="">Select account</option>
-              <option v-for="option in ACCOUNT_OPTIONS" :key="option" :value="option">
+              <option v-for="option in ADJUSTMENT_ACCOUNT_OPTIONS" :key="option" :value="option">
                 {{ option }}
               </option>
             </MpSelect>
@@ -496,6 +496,7 @@ import {
 import StorageQuantityDrawer from "~/components/products/StorageQuantityDrawer.vue";
 import DefaultPageContent from "~/components/template/DefaultPageContent.vue";
 import {
+  ADJUSTMENT_ACCOUNT_OPTIONS,
   ADJUSTMENT_CATEGORY_OPTIONS,
   ADJUSTMENT_TYPE_LABEL,
   ADJUSTMENT_TYPE_OPTIONS,
@@ -543,16 +544,6 @@ const isEdit = computed(() => props.recordId != null);
 const existing = computed(() =>
   props.recordId != null ? getStockAdjustmentById(props.recordId) : undefined
 );
-
-/** Where the adjustment's value lands. Kept beside the form rather than in the
- *  data module because it is a chart-of-accounts concern the catalogue has no
- *  opinion on. */
-const ACCOUNT_OPTIONS = [
-  "Inventory Adjustment",
-  "Cost of Goods Sold",
-  "Work in Process",
-  "Marketing Expense"
-];
 
 const form = reactive<StockAdjustmentInput>(emptyStockAdjustmentInput());
 const dateText = ref("");

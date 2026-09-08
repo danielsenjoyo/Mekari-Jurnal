@@ -476,6 +476,13 @@
           </MpModalFooter>
         </MpModalContent>
       </MpModal>
+
+      <AdjustStockDrawer
+        :is-open="isAdjustDrawerOpen"
+        :product="product"
+        @close="isAdjustDrawerOpen = false"
+        @saved="refreshTick++"
+      />
     </template>
   </DefaultPageContent>
 </template>
@@ -515,6 +522,7 @@ import {
   MpTextlink,
   MpTooltip
 } from "@mekari/pixel3";
+import AdjustStockDrawer from "~/components/products/AdjustStockDrawer.vue";
 import DefaultPageContent from "~/components/template/DefaultPageContent.vue";
 import {
   deleteProductRecords,
@@ -553,10 +561,20 @@ const route = useRoute();
 const productId = computed(() => Number(route.params.id));
 
 // Plain module state, so a mutation on this page needs a re-read to be seen.
+//
+// `getProductById` hands back the SAME object `PRODUCTS` holds — bumping
+// refreshTick makes this computed re-run, but Vue's computed only notifies its
+// dependents when the returned VALUE changes, and `Object.is(sameRef, sameRef)`
+// is true even after the object's own fields were mutated in place. Spreading
+// it into a new object on every re-run is what makes the identity actually
+// change, which is what a template reading `product.quantity` (or any other
+// field) needs to see the write this page's own actions just made — Archive
+// and Adjust stock both rely on this.
 const refreshTick = ref(0);
 const product = computed(() => {
   void refreshTick.value;
-  return getProductById(productId.value);
+  const found = getProductById(productId.value);
+  return found ? { ...found } : undefined;
 });
 
 useHead({
@@ -643,10 +661,10 @@ function confirmDelete() {
   navigateTo("/products");
 }
 
-// Inert in this prototype: the stock-adjustment drawer is a form of its own,
-// and no stock-adjustment create screen has been cloned yet.
+const isAdjustDrawerOpen = ref(false);
+
 function onAction(action: string) {
-  void action;
+  if (action === "adjust-stock") isAdjustDrawerOpen.value = true;
 }
 
 // All css() below uses Pixel 3 token shortcuts only (token mode 2.1).

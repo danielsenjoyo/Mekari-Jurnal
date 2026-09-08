@@ -312,6 +312,27 @@ ended at 1503; left alignment puts both at 1319. If you do want right-aligned
 figures, the header label and its icon have to be right-aligned as a unit, with
 the icon _before_ the label — not just `justify-content: flex-end` on the row.
 
+### 9.1b Hideable columns (optional)
+
+A tab whose column set is wide enough to scroll can put the set behind a
+**column picker** on the left of the filter bar — a popover of checkboxes, one
+per column. Hold **one array of hidden keys** and filter the tab's set through
+it, so the `<colgroup>`, the header row and the cells all keep deriving from
+the same `columns` computed:
+
+```ts
+const hiddenColumns = ref<ColumnKey[]>([...DEFAULT_HIDDEN_COLUMNS]);
+const columns = computed(() =>
+  COLUMNS_BY_TAB[activeTabKey.value].filter((c) => !hiddenColumns.value.includes(c.key))
+);
+```
+
+The link column is locked on (a table of attributes with nothing to click
+through to is not a list), and the picker only appears on the tab it belongs to.
+Full rules — including why an array rather than a `Set`, and the
+`MpTooltip`-inside-`MpPopoverTrigger` trap — in
+[`patterns/FilterBar.md`](./patterns/FilterBar.md).
+
 ### 9.2 Header
 
 - `MpTableHead` is `is-fixed` (sticky). The library renders its bottom border as a **2px box-shadow on `<thead>`** — override it to **1px** via `tableHeadClass` (`box-shadow: 0 1px 0 0 var(--mp-colors-gray-100)`). This applies to both the default and bulk header rows.
@@ -487,6 +508,7 @@ only touches `pagedRows` ids).
 
 ## Changelog
 
+- **v1.6.0** — Added §9.1b: hideable columns behind a filter-bar column picker (one array of hidden keys filtered through the tab's set; the link column locked on). Full rules, and the two list-management controls that sit beside it, in [`patterns/FilterBar.md`](./patterns/FilterBar.md); the file flows a list page can carry in its title band in [`patterns/ImportExport.md`](./patterns/ImportExport.md).
 - **v1.5.0** — Added §9.1a: align all columns left, including money. Right-aligned figures don't line up with a sortable header, because the sort icon pushes the label off the shared edge.
 - **v1.4.0** — Reworked §9.1 column sizing: **per-column px widths** (a `COLUMN_WIDTH` map with a derived `min-width`) replace the even percentage split, which was starving every column to the narrowest one's width and clipping document numbers mid-string; horizontal overflow of `MpTableContainer` is now stated as intended behaviour rather than something to design around. Cell text **wraps instead of clipping**, and the `!`-forced override an `MpTextlink`/`MpButton` cell needs is documented as `display:flex!` + `width:full!` + `justifyContent` (without which a long value renders centred and spilling off _both_ sides). Also documented the Actions column (§9.3) as optional — dropped on the Purchases index page in favour of the record link + bulk bar.
 - **v1.3.0** — Dropped the blank-slate **Clear filters** CTA. Recovery now happens through the **search field's own clear (×) button** (revealed on hover/focus, only with a keyword, `@click="search = ''"` — the library's `is-clearable` is avoided because its svg clear emits `undefined`) and the clearable quick-filter selects. Added a `searchTerm` computed to normalize the search keyword.

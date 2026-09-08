@@ -368,10 +368,18 @@ import {
 const route = useRoute();
 const masterId = computed(() => Number(route.params.id));
 
+// `getProductMasterById` hands back the SAME object `PRODUCT_MASTERS` holds —
+// bumping refreshTick re-runs this computed, but Vue only notifies dependents
+// when the returned VALUE's identity changes, and mutating an object in place
+// (confirmArchive, below) doesn't change that identity. Spreading it into a
+// new object on every re-run is what makes Archive actually show up without
+// navigating away — see app/pages/products/detail/[id].vue for the same fix,
+// found and written up first.
 const refreshTick = ref(0);
 const master = computed(() => {
   void refreshTick.value;
-  return getProductMasterById(masterId.value);
+  const found = getProductMasterById(masterId.value);
+  return found ? { ...found } : undefined;
 });
 
 useHead({

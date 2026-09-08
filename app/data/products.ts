@@ -139,6 +139,17 @@ export const PRODUCT_TYPE_LABEL: Record<ProductType, string> = {
 
 export const PRODUCT_TYPE_OPTIONS = Object.keys(PRODUCT_TYPE_LABEL) as ProductType[];
 
+/**
+ * The tenant's product categories.
+ *
+ * Mutable on purpose: the product list's "Manage product category" modal adds,
+ * renames and removes entries here, and every consumer (the two forms' category
+ * pickers, the filter drawer, the list's quick filter) reads this same array,
+ * so a rename made in the modal is the rename everywhere. Mutated in place
+ * rather than reassigned — the module's consumers import the binding.
+ *
+ * See the category-management block further down for the accessors.
+ */
 export const PRODUCT_CATEGORIES = [
   "Raw material",
   "Finished goods",
@@ -147,6 +158,9 @@ export const PRODUCT_CATEGORIES = [
   "Office supply",
   "Service"
 ];
+
+/** The source's category name field is capped at 50 characters. */
+export const PRODUCT_CATEGORY_NAME_MAX_LENGTH = 50;
 
 /** Kept in step with the Purchases module's WAREHOUSE_OPTIONS for the two it
  *  shares, so a purchase received into "Main Warehouse" lands somewhere this
@@ -158,7 +172,18 @@ export const WAREHOUSE_OPTIONS = [
   "Surabaya Hub"
 ];
 
+/**
+ * The tenant's units of measure.
+ *
+ * Mutable, on the same reasoning as `PRODUCT_CATEGORIES` just above: both
+ * product forms' unit pickers and the Other Lists "Product units" page read
+ * this one array, so a rename made on that page is the rename everywhere. See
+ * the unit-management block further down for the accessors.
+ */
 export const UNIT_OPTIONS = ["Pcs", "Box", "Kg", "Roll", "Litre", "Set", "Hour"];
+
+/** The source's unit name field is capped at 20 characters. */
+export const PRODUCT_UNIT_NAME_MAX_LENGTH = 20;
 
 export const PRODUCT_TAG_OPTIONS = [
   "Fast moving",
@@ -2083,6 +2108,17 @@ export function getPriceRules(): PriceRule[] {
  */
 export const ADJUSTMENT_CATEGORY_OPTIONS = ["General", "Waste", "Production", "Opening Quantity"];
 
+/** Where an adjustment's value lands. A chart-of-accounts concern the
+ *  catalogue otherwise has no opinion on — kept here only because it now has
+ *  two consumers (the stock adjustment form and the product detail page's
+ *  quick-adjust drawer) and a second copy would drift from the first. */
+export const ADJUSTMENT_ACCOUNT_OPTIONS = [
+  "Inventory Adjustment",
+  "Cost of Goods Sold",
+  "Work in Process",
+  "Marketing Expense"
+];
+
 // ---------------------------------------------------------------------------
 // Mutations. The arrays above are plain (non-reactive) module state, so a page
 // that calls one of these has to re-read through the getters to see the change
@@ -2864,6 +2900,151 @@ export function getStorableLocations(warehouseId: number): StorageLocation[] {
   return getStorageLocationTree(warehouseId).filter((location) =>
     storableLevels.includes(location.level)
   );
+}
+
+// ---------------------------------------------------------------------------
+// Product categories — the list behind "Manage product category"
+// ---------------------------------------------------------------------------
+//
+// Cloned from the source's category-modal, which manages the same list from
+// the product list rather than from Settings: the categories only exist to
+// group products, and the person grouping them is looking at the list.
+//
+// Names are the identity — there is no id — because that is what a product
+// stores in its `category` field and what every picker in this module shows. A
+// rename therefore has to sweep the products and masters that carry the old
+// name, which `renameProductCategory` does.
+
+/** One row of the manage-category modal: the name and what uses it. */
+export interface ProductCategoryUsage {
+  name: string;
+  /** Products plus masters carrying this category. The modal's Total column. */
+  productCount: number;
+}
+
+/** Sorted by name — the modal lists them alphabetically, like the source. */
+export function getProductCategories(): string[] {
+  return PRODUCT_CATEGORIES.slice().sort((a, b) => a.localeCompare(b));
+}
+
+/** How many records would be left describing themselves with a name that no
+ *  longer exists if this category went away. Zero is what unlocks Delete. */
+export function getProductCategoryUsage(name: string): number {
+  const wanted = name.trim().toLowerCase();
+  const products = PRODUCTS.filter((p) => p.category.toLowerCase() === wanted).length;
+  const masters = PRODUCT_MASTERS.filter((m) => m.category.toLowerCase() === wanted).length;
+  return products + masters;
+}
+
+export function getProductCategoriesWithUsage(): ProductCategoryUsage[] {
+  return getProductCategories().map((name) => ({
+    name,
+    productCount: getProductCategoryUsage(name)
+  }));
+}
+
+/** Two categories with the same name would make every picker ambiguous, so
+ *  this is what the modal validates a new or renamed entry against. */
+export function isProductCategoryNameTaken(name: string, exceptName?: string): boolean {
+  const wanted = name.trim().toLowerCase();
+  const except = exceptName?.trim().toLowerCase();
+  return PRODUCT_CATEGORIES.some(
+    (existing) => existing.toLowerCase() !== except && existing.toLowerCase() === wanted
+  );
+}
+
+export function createProductCategory(name: string): void {
+  PRODUCT_CATEGORIES.push(name.trim());
+}
+
+/**
+ * Rename in place AND on every record carrying the old name.
+ *
+ * Without the sweep a renamed category would silently orphan its products: they
+ * would still hold the old string, so they would vanish from the category
+ * filter and show a name the picker no longer offers.
+ */
+export function renameProductCategory(from: string, to: string): void {
+  const next = to.trim();
+  const index = PRODUCT_CATEGORIES.indexOf(from);
+  if (index < 0) return;
+  PRODUCT_CATEGORIES[index] = next;
+  for (const product of PRODUCTS) if (product.category === from) product.category = next;
+  for (const master of PRODUCT_MASTERS) if (master.category === from) master.category = next;
+}
+
+/** Refuses while anything still uses the category — the modal only offers
+ *  Delete at a zero count, and this is the same rule enforced at the source. */
+export function deleteProductCategory(name: string): boolean {
+  if (getProductCategoryUsage(name) > 0) return false;
+  const index = PRODUCT_CATEGORIES.indexOf(name);
+  if (index < 0) return false;
+  PRODUCT_CATEGORIES.splice(index, 1);
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Product units — the "Product units" page under Other Lists
+// ---------------------------------------------------------------------------
+//
+// Cloned from jurnal-frontend-app src/pages/other-lists/product-units/, a
+// tenant-wide vocabulary list in the same shape as product categories just
+// above: no id, the name IS the identity, and a rename has to sweep the
+// products and masters carrying the old one.
+
+/** One row of the product-units page: the name and what uses it. */
+export interface ProductUnitUsage {
+  name: string;
+  productCount: number;
+}
+
+/** Sorted by name — the page lists them alphabetically, like categories. */
+export function getProductUnits(): string[] {
+  return UNIT_OPTIONS.slice().sort((a, b) => a.localeCompare(b));
+}
+
+export function getProductUnitUsage(name: string): number {
+  const wanted = name.trim().toLowerCase();
+  const products = PRODUCTS.filter((p) => p.unit.toLowerCase() === wanted).length;
+  const masters = PRODUCT_MASTERS.filter((m) => m.unit.toLowerCase() === wanted).length;
+  return products + masters;
+}
+
+export function getProductUnitsWithUsage(): ProductUnitUsage[] {
+  return getProductUnits().map((name) => ({ name, productCount: getProductUnitUsage(name) }));
+}
+
+export function isProductUnitNameTaken(name: string, exceptName?: string): boolean {
+  const wanted = name.trim().toLowerCase();
+  const except = exceptName?.trim().toLowerCase();
+  return UNIT_OPTIONS.some(
+    (existing) => existing.toLowerCase() !== except && existing.toLowerCase() === wanted
+  );
+}
+
+export function createProductUnit(name: string): void {
+  UNIT_OPTIONS.push(name.trim());
+}
+
+/** Rename in place AND on every record carrying the old name — see
+ *  `renameProductCategory`'s comment for why the sweep isn't optional. */
+export function renameProductUnit(from: string, to: string): void {
+  const next = to.trim();
+  const index = UNIT_OPTIONS.indexOf(from);
+  if (index < 0) return;
+  UNIT_OPTIONS[index] = next;
+  for (const product of PRODUCTS) if (product.unit === from) product.unit = next;
+  for (const master of PRODUCT_MASTERS) if (master.unit === from) master.unit = next;
+}
+
+/** Refuses while anything still uses the unit — the page only offers Delete
+ *  at a zero count. */
+export function deleteProductUnit(name: string): boolean {
+  if (getProductUnitUsage(name) > 0) return false;
+  const index = UNIT_OPTIONS.indexOf(name);
+  if (index < 0) return false;
+  UNIT_OPTIONS.splice(index, 1);
+  return true;
 }
 
 // ---------------------------------------------------------------------------

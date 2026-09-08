@@ -40,14 +40,6 @@
             </div>
           </MpFormControl>
 
-          <MpFormControl v-if="fields.category">
-            <MpFormLabel>Product category</MpFormLabel>
-            <MpSelect v-model="form.category" is-full-width>
-              <option value="">All categories</option>
-              <option v-for="opt in PRODUCT_CATEGORIES" :key="opt" :value="opt">{{ opt }}</option>
-            </MpSelect>
-          </MpFormControl>
-
           <MpFormControl v-if="fields.productType">
             <MpFormLabel>Product type</MpFormLabel>
             <MpSelect v-model="form.productType" is-full-width>
@@ -55,6 +47,14 @@
               <option v-for="opt in PRODUCT_TYPE_OPTIONS" :key="opt" :value="opt">
                 {{ PRODUCT_TYPE_LABEL[opt] }}
               </option>
+            </MpSelect>
+          </MpFormControl>
+
+          <MpFormControl v-if="fields.category">
+            <MpFormLabel>Product category</MpFormLabel>
+            <MpSelect v-model="form.category" is-full-width>
+              <option value="">All categories</option>
+              <option v-for="opt in PRODUCT_CATEGORIES" :key="opt" :value="opt">{{ opt }}</option>
             </MpSelect>
           </MpFormControl>
 
@@ -153,12 +153,7 @@
 
       <MpDrawerFooter>
         <div :class="footerClass">
-          <MpTextlink as="button" variant="primary" @click="onReset">
-            <span :class="labelWithIconClass">
-              <MpIcon name="reset" size="sm" />
-              Reset
-            </span>
-          </MpTextlink>
+          <MpTextlink as="button" variant="primary" @click="onReset">Reset</MpTextlink>
           <div :class="footerRightClass">
             <MpButton variant="ghost" @click="onCancel">Cancel</MpButton>
             <MpButton variant="primary" @click="onApply">Apply</MpButton>
