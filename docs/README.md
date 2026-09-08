@@ -20,6 +20,7 @@ and the `@mekari/pixel3` component library.
 | Work on the Home landing page                   | [`patterns/home-page-format.md`](./patterns/home-page-format.md)                                                        |
 | Build a catalog page (tabs → grid of links)     | [`patterns/reports-index-format.md`](./patterns/reports-index-format.md)                                                |
 | Build a report screen (range → run → totals)    | [`patterns/reports-page-format.md`](./patterns/reports-page-format.md)                                                  |
+| Build a tenant-wide named-list management page  | [`patterns/VocabularyList.md`](./patterns/VocabularyList.md)                                                            |
 | Work on warehouse storage locations             | [`storage-locations.md`](./storage-locations.md)                                                                        |
 
 ## Map
@@ -58,6 +59,8 @@ implementation [`app/pages/templates/index-template.vue`](../app/pages/templates
 - [`BlankSlate.md`](./patterns/BlankSlate.md) — adaptive empty state.
 - [`Form.md`](./patterns/Form.md) — `MpFormControl`-wrapped fields.
 - [`Modal.md`](./patterns/Modal.md) — centred confirm/focused dialog.
+- [`ImportExport.md`](./patterns/ImportExport.md) — file in / file out: the title-band menus, the three-step import modal, the export column picker, and the CSV helpers.
+- [`VocabularyList.md`](./patterns/VocabularyList.md) — a tenant-wide list of names other records pick from (location types, product categories, product units): inline row states, usage-gated delete, and the "one array, two surfaces" rule.
 
 ### Deep reference
 

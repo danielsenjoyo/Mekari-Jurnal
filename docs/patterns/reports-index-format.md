@@ -15,8 +15,11 @@ Ported from `jurnal-frontend-app` → `src/pages/reports/index/`.
 The stage holds a **fixed, curated set of destinations**, not records. Nothing
 is filtered, sorted, selected or paginated, so none of the index-page
 machinery applies — no `FilterBar`, no `TablePage`, no `Pagination`,
-no `BulkActionBar`. Reports is the one such page today; a future "all
-integrations" or "template gallery" screen would use the same shape.
+no `BulkActionBar`. Reports is the first instance;
+[`other-lists/index.vue`](../../app/pages/other-lists/index.vue) is the
+second — the same card shape, minus the tab bar (with only two entries, one
+category is all there is). A future "all integrations" or "template gallery"
+screen would use the same shape again.
 
 ## Composition
 

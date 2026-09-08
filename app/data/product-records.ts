@@ -13,7 +13,13 @@
 // (product-transactions, warehouse-stock, batch-list) and
 // src/pages/products/{batches,conversion}/.
 
-import { WAREHOUSE_OPTIONS, getProductById, type BundleItem, type Product } from "~/data/products";
+import {
+  WAREHOUSE_OPTIONS,
+  getProductById,
+  getProducts,
+  type BundleItem,
+  type Product
+} from "~/data/products";
 import { toLocalIsoDate } from "~/utils/dates";
 
 function dateAt(daysFromToday: number): string {
@@ -411,6 +417,65 @@ export function resultLinesForBundle(items: BundleItem[]): ConversionCostLine[] 
       quantityPer: item.quantity
     };
   });
+}
+
+/** One line of the "View journal entry" table: an account and which side of
+ *  it this conversion posted to. Exactly one of `debit`/`credit` is non-zero,
+ *  matching the source's table shape. */
+export interface JournalEntryLine {
+  account: string;
+  debit: number;
+  credit: number;
+}
+
+/**
+ * The conversion's journal entry, derived from the record rather than stored —
+ * there is no ledger in this prototype, so this is computed fresh from the
+ * same fields the detail page's totals block reads, which is what keeps the
+ * two from disagreeing.
+ *
+ * The posting: breaking a bundle apart moves value OUT of the source
+ * product's inventory account and INTO each component's — a component looked
+ * up by name against the current catalogue, falling back to the source's own
+ * account for one that has since left it. Any additional cost (packaging,
+ * labour, …) adds to the components' inventory the same way, paid out of the
+ * account the conversion charged it to.
+ *
+ *   Debit  component inventory account   × componentTotal (one line each)
+ *   Debit  source inventory account      × additionalTotal (the overhead landing in inventory)
+ *   Credit source inventory account      × componentTotal (the bundle's value leaving)
+ *   Credit each additional-cost account  × its amount
+ *
+ * Debits and credits both sum to `total` — see `computeConversionTotal`.
+ */
+export function computeConversionJournalEntries(conversion: ProductConversion): JournalEntryLine[] {
+  const sourceAccount = getProductById(conversion.sourceProductId)?.inventoryAccount || "Inventory";
+  const products = getProducts();
+
+  const componentDebits: JournalEntryLine[] = conversion.results.map((line) => {
+    const component = products.find((p) => p.name === line.name);
+    return {
+      account: component?.inventoryAccount || sourceAccount,
+      debit: line.costPerUnit * line.quantityPer * conversion.quantity,
+      credit: 0
+    };
+  });
+
+  const additionalTotal = conversion.additionalCosts.reduce((sum, cost) => sum + cost.amount, 0);
+  const componentTotal = componentDebits.reduce((sum, line) => sum + line.debit, 0);
+
+  return [
+    ...componentDebits,
+    // The overhead's other half — it lands in inventory alongside the
+    // components, on the same account the bundle itself was carried in.
+    ...(additionalTotal > 0 ? [{ account: sourceAccount, debit: additionalTotal, credit: 0 }] : []),
+    { account: sourceAccount, debit: 0, credit: componentTotal },
+    ...conversion.additionalCosts.map((cost) => ({
+      account: cost.account,
+      debit: 0,
+      credit: cost.amount
+    }))
+  ];
 }
 
 export function createConversion(input: ConversionInput): ProductConversion {

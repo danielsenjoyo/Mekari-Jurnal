@@ -171,6 +171,60 @@ The two `local` white gradients ride with the content and scroll away; the two
 whichever side still has content and vanishes at each end — **no
 `ResizeObserver`, no scroll listener, no reactive state**.
 
+## Expandable groups (a parent row over its children)
+
+Where a row is a **header for records underneath it** rather than a record of
+its own — a product master over its variants — the table becomes a grouping
+table. Reference impl: the Products index's "Product with variant" tab.
+
+- **The 44px first column holds the expander, not a checkbox.** A group header
+  isn't a thing you bulk-archive, so that tab drops selection entirely
+  (`isSelectable === false`) and spends the column on a ghost `MpButton` with
+  `caret-right` / `caret-down` and an `aria-expanded`.
+- **The parent row's other cells stay empty.** Every figure on the tab belongs
+  to a child; repeating a rolled-up zero across twelve columns says the parent
+  has no stock rather than that it has no figures of its own.
+- **The children go in ONE full-width cell holding a nested table**, not in
+  sibling `<tr>`s:
+
+  ```vue
+  <MpTableRow v-if="row.isGroup && isExpanded(row.id)">
+    <MpTableCell as="td" :colspan="colWidths.length + 1" :class="expansionCellClass">
+      <div :class="expansionScrollClass" :data-variant-scroller="row.id">
+        <MpTable :class="tableFixedClass">
+          <colgroup><!-- the SAME widths as the outer table --></colgroup>
+          …
+        </MpTable>
+      </div>
+    </MpTableCell>
+  </MpTableRow>
+  ```
+
+  A `<tbody>` cannot be given its own scrollbar without `display: block`, which
+  drops it out of table layout and takes the column widths with it. The nested
+  table keeps `table-layout: fixed` and repeats the outer `<colgroup>`, so the
+  two align exactly — this is only possible because the widths are authoritative
+  px values (see [Column widths](#column-widths--fixed-layout--colgroup)).
+
+- **Cap the group at five rows and scroll the rest.** Beyond that the group
+  stops being glanceable and pushes the next parent off screen.
+- **Measure the cap; don't guess it.** A child row's height depends on whether
+  its name wraps, so a `css()` constant cuts mid-row. Measure the fifth row
+  after expanding and write `style.maxHeight` — the same reason the `<colgroup>`
+  widths are inline, a value only layout can supply:
+
+  ```ts
+  const last = rows[MAX_EXPANDED_ROWS - 1]!;
+  scroller.style.maxHeight = `${last.offsetTop + last.offsetHeight}px`;
+  ```
+
+  Leave it unset when there are five or fewer — a scroller with nothing to
+  scroll still reserves the gutter on some platforms.
+
+- **Children are not rows of the list.** They never paginate, never sort and
+  never match the filter on their own, so build them on demand
+  (`variantRowsFor(masterId)`) rather than folding them into the rows array.
+
 ## Gotchas
 
 - **No classes on `tr`/`td`** for table styling — `MpTable` styles via `.mp-table` descendants. Pass layout via `:class` on `MpTable` / `MpTableHead`, and the sticky/width classes on the specific `as="th"`/`as="td"` cells.

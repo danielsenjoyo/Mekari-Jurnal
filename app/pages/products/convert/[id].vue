@@ -47,7 +47,7 @@
             :class="textlinkAlignClass"
             as="button"
             variant="secondary"
-            @click="onAction('journal-entry')"
+            @click="isJournalEntryModalOpen = true"
           >
             View journal entry
           </MpTextlink>
@@ -189,6 +189,69 @@
           </MpModalFooter>
         </MpModalContent>
       </MpModal>
+
+      <!-- Debit/credit table for the entry this conversion posted — computed
+           from the record itself (docs/patterns/ImportExport.md's sibling
+           case: no ledger exists here either, so the number on screen has to
+           come from the same record the totals block reads). -->
+      <MpModal
+        id="conversion-journal-entry-modal"
+        :is-open="isJournalEntryModalOpen"
+        size="lg"
+        is-centered
+        @close="isJournalEntryModalOpen = false"
+      >
+        <MpModalOverlay />
+        <MpModalContent>
+          <MpModalHeader>
+            <span :class="modalTitleClass">Journal entry {{ conversion.number }}</span>
+            <MpModalCloseButton />
+          </MpModalHeader>
+          <MpModalBody>
+            <MpTableContainer :class="journalScrollClass">
+              <MpTable :is-hoverable="false">
+                <MpTableHead>
+                  <MpTableRow>
+                    <MpTableCell as="th">Account</MpTableCell>
+                    <MpTableCell as="th" :class="numCellClass">Debit</MpTableCell>
+                    <MpTableCell as="th" :class="numCellClass">Credit</MpTableCell>
+                  </MpTableRow>
+                </MpTableHead>
+                <MpTableBody>
+                  <MpTableRow v-for="(line, index) in journalEntries" :key="index">
+                    <MpTableCell as="td" :class="wrapCellClass">{{ line.account }}</MpTableCell>
+                    <MpTableCell as="td" :class="numCellClass">
+                      {{ line.debit ? formatAmount(line.debit) : "—" }}
+                    </MpTableCell>
+                    <MpTableCell as="td" :class="numCellClass">
+                      {{ line.credit ? formatAmount(line.credit) : "—" }}
+                    </MpTableCell>
+                  </MpTableRow>
+                  <!-- The balance line, in the table body rather than a div
+                       below it — a div can't line its two figures up under
+                       the Debit/Credit columns without re-deriving their
+                       widths. -->
+                  <MpTableRow :class="journalTotalRowClass">
+                    <MpTableCell as="td">
+                      <MpText weight="semiBold" color="dark">Total</MpText>
+                    </MpTableCell>
+                    <MpTableCell as="td" :class="numCellClass">
+                      <MpText weight="semiBold" color="dark">{{
+                        formatAmount(totals.total)
+                      }}</MpText>
+                    </MpTableCell>
+                    <MpTableCell as="td" :class="numCellClass">
+                      <MpText weight="semiBold" color="dark">{{
+                        formatAmount(totals.total)
+                      }}</MpText>
+                    </MpTableCell>
+                  </MpTableRow>
+                </MpTableBody>
+              </MpTable>
+            </MpTableContainer>
+          </MpModalBody>
+        </MpModalContent>
+      </MpModal>
     </template>
   </DefaultPageContent>
 </template>
@@ -220,7 +283,11 @@ import {
 } from "@mekari/pixel3";
 import DefaultPageContent from "~/components/template/DefaultPageContent.vue";
 import { formatAmount, formatCurrency, formatDisplayDate, formatQuantity } from "~/data/products";
-import { computeConversionTotal, getConversionById } from "~/data/product-records";
+import {
+  computeConversionJournalEntries,
+  computeConversionTotal,
+  getConversionById
+} from "~/data/product-records";
 import { textlinkAlignClass } from "~/utils/textlink-align";
 
 // Product conversion detail. Cloned from jurnal-frontend-app
@@ -259,9 +326,10 @@ function confirmRevert() {
   navigateTo(`/products/detail/${conversion.value?.sourceProductId ?? ""}`);
 }
 
-function onAction(action: string) {
-  void action;
-}
+const isJournalEntryModalOpen = ref(false);
+const journalEntries = computed(() =>
+  conversion.value ? computeConversionJournalEntries(conversion.value) : []
+);
 
 // All css() below uses Pixel 3 token shortcuts only (token mode 2.1).
 const bannerClass = css({ mb: 6 });
@@ -312,6 +380,11 @@ const bulletListClass = css({ pl: 5, mt: 2, listStyleType: "disc" });
 
 const modalTitleClass = css({ fontSize: "lg" });
 const modalFooterClass = css({ display: "flex", justifyContent: "flex-end", gap: 2 });
+
+const journalScrollClass = css({ maxHeight: "360px", overflowY: "auto" });
+// A double top border reads as a balance line in a debit/credit table — the
+// same convention the totals block above uses with its dashed divider.
+const journalTotalRowClass = css({ borderTopWidth: "sm", borderColor: "gray.600" });
 
 const bottomActionsClass = css({
   display: "flex",

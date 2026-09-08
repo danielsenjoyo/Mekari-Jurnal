@@ -134,12 +134,7 @@
 
       <MpDrawerFooter>
         <div :class="footerClass">
-          <MpTextlink as="button" variant="primary" @click="onReset">
-            <span :class="labelWithIconClass">
-              <MpIcon name="reset" size="sm" />
-              Reset filter
-            </span>
-          </MpTextlink>
+          <MpTextlink as="button" variant="primary" @click="onReset">Reset filter</MpTextlink>
           <div :class="footerRightClass">
             <MpButton variant="ghost" @click="onCancel">Cancel</MpButton>
             <MpButton variant="primary" @click="onApply">Filter</MpButton>

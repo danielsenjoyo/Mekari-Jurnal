@@ -374,10 +374,18 @@ import { textlinkCellClass } from "~/utils/textlink-align";
 const route = useRoute();
 const warehouseId = computed(() => Number(route.params.id));
 
+// `getWarehouseById` hands back the SAME object `WAREHOUSES` holds — bumping
+// refreshTick re-runs this computed, but Vue only notifies dependents when the
+// returned VALUE's identity changes, and mutating an object in place
+// (onToggleActive, below) doesn't change that identity. Spreading it into a
+// new object on every re-run is what makes the Active/Inactive badge actually
+// flip without navigating away — see app/pages/products/detail/[id].vue for
+// the same fix, found and written up first.
 const refreshTick = ref(0);
 const warehouse = computed(() => {
   void refreshTick.value;
-  return getWarehouseById(warehouseId.value);
+  const found = getWarehouseById(warehouseId.value);
+  return found ? { ...found } : undefined;
 });
 
 useHead({

@@ -1,23 +1,15 @@
 <template>
   <DefaultPageContent title="Products">
-    <!-- Title-band actions. The source puts everything behind one "Actions"
-         dropdown (src/pages/products/components/action-dropdown), grouped into
-         PRODUCT / WAREHOUSE / PRICE RULE sections, with Import as the only
-         thing outside it. Kept as-is: the sections are what stop a nine-item
-         menu reading as a flat list, and the grouping is how a user finds
-         "Transfer warehouse" without knowing it is a warehouse action. -->
+    <!-- Title-band actions. One "Actions" dropdown and nothing else, as the
+         source has it (src/pages/products/components/action-dropdown), grouped
+         into PRODUCT / WAREHOUSE / PRICE RULE sections — the sections are what
+         stop a nine-item menu reading as a flat list, and the grouping is how a
+         user finds "Transfer warehouse" without knowing it is a warehouse
+         action.
+
+         Import and Export are NOT here. They belong to one list each, so they
+         sit on that list's toolbar (Zone C) where the source puts them. -->
     <template #actions>
-      <!-- Only on the Warehouses segment: the settings behind it (the storage
-           location switch, the location types) are warehouse settings, and on
-           the other two segments they would be a button about somewhere else. -->
-      <MpButton
-        v-if="activeSegmentKey === 'warehouses'"
-        variant="secondary"
-        @click="navigateTo('/products/warehouse/settings')"
-      >
-        Warehouse settings
-      </MpButton>
-      <MpButton variant="secondary" @click="onAction('import')">Import</MpButton>
       <!-- `is-close-on-select`: one of these entries opens a drawer rather
            than navigating, and a menu left standing over it covers the thing
            it just opened. -->
@@ -155,29 +147,158 @@
       </MpTabList>
     </MpTabs>
 
-    <!-- Zone C — filter bar. Which quick selects appear depends on the tab:
-         eight tabs over eight entities share almost no field, so a fixed pair
-         of selects would be inert on most of them. -->
+    <!-- Zone C — the list toolbar. Which controls appear is per-tab
+         (TOOLBAR_BY_TAB): eight tabs over eight entities share almost no
+         control, and the source gives each tab only what acts on its own list.
+         Left holds the controls that change how the list reads; right holds the
+         file actions, then search, then Filter. -->
     <div :class="filterBarClass">
       <div :class="filterLeftClass">
-        <div v-for="quick in quickFilters" :key="quick" :class="quickFilterClass">
-          <MpSelect
-            :model-value="filter[quick]"
-            :placeholder="QUICK_FILTER_ALL_LABEL[quick]"
-            is-full-width
-            is-clearable
-            @update:model-value="setQuickFilter(quick, $event)"
-          >
-            <option value="">{{ QUICK_FILTER_ALL_LABEL[quick] }}</option>
-            <option v-for="opt in quickFilterOptions(quick)" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
-            </option>
-          </MpSelect>
-        </div>
+        <!-- Column picker — icon only, on every tab that has one.
+             `aria-label` is the accessible name the dropped label used to give
+             it: an MpButton with icons and no slot content renders as a
+             button-icon (data-has-label=false), and the name has to come from
+             somewhere. No MpTooltip on it either — a tooltip between
+             MpPopoverTrigger and its button swallows the click.
+
+             NOTE: nothing may sit inside MpPopoverTrigger except the button —
+             not even an HTML comment. The trigger renders the FIRST node of its
+             slot, and a comment is a node, so a comment there makes the whole
+             control vanish (docs/patterns/FilterBar.md). -->
+        <MpPopover
+          v-if="toolbar.hasColumnPicker"
+          placement="bottom-start"
+          use-portal
+          is-adaptive-width
+        >
+          <template #default>
+            <MpPopoverTrigger>
+              <MpButton
+                variant="secondary"
+                left-icon="table-view-column"
+                right-icon="caret-down"
+                aria-label="Shown columns"
+              />
+            </MpPopoverTrigger>
+            <MpPopoverContent>
+              <div :class="columnMenuClass">
+                <!-- Not is-close-on-select: picking columns is several
+                     decisions, and a menu that shuts on the first one makes the
+                     user reopen it for each. -->
+                <MpCheckbox
+                  v-for="column in COLUMNS_BY_TAB[activeTabKey]"
+                  :id="`column-toggle-${column.key}`"
+                  :key="column.key"
+                  :is-checked="!hiddenColumns.includes(column.key)"
+                  :is-disabled="column.link"
+                  @change="toggleColumn(column.key, $event)"
+                >
+                  {{ column.label }}
+                </MpCheckbox>
+              </div>
+            </MpPopoverContent>
+          </template>
+        </MpPopover>
+
+        <MpButton
+          v-if="toolbar.hasManageCategory"
+          variant="secondary"
+          @click="isCategoryModalOpen = true"
+        >
+          Manage product category
+        </MpButton>
       </div>
 
       <div :class="filterRightClass">
-        <div :class="filterButtonWrapClass">
+        <!-- The warehouse list's own switch, in place of a status filter: a
+             deactivated warehouse is hidden rather than filtered out, so the
+             question is "show them too?", not "which status?". -->
+        <MpToggle
+          v-if="toolbar.hasInactiveToggle"
+          id="show-inactive-warehouses"
+          :is-checked="showInactiveWarehouses"
+          @change="onToggleInactiveWarehouses"
+        >
+          Show inactive warehouses
+        </MpToggle>
+
+        <!-- The product list imports three different things, so it gets a menu.
+             Every other tab imports exactly one, so it gets a button. -->
+        <MpPopover
+          v-if="toolbar.importKind === 'menu'"
+          placement="bottom-end"
+          use-portal
+          is-adaptive-width
+          is-close-on-select
+        >
+          <template #default>
+            <MpPopoverTrigger>
+              <MpButton variant="secondary" right-icon="caret-down">Import</MpButton>
+            </MpPopoverTrigger>
+            <MpPopoverContent>
+              <template v-for="(group, index) in IMPORT_GROUPS" :key="group.title">
+                <MpDivider v-if="index > 0" :class="menuDividerClass" />
+                <MpText as="p" size="overline" color="gray.600" :class="menuSectionClass">
+                  {{ group.title }}
+                </MpText>
+                <MpPopoverList>
+                  <MpPopoverListItem
+                    v-for="item in group.items"
+                    :key="item.kind"
+                    role="menuitem"
+                    @click="openImport(item.kind)"
+                  >
+                    {{ item.label }}
+                  </MpPopoverListItem>
+                </MpPopoverList>
+              </template>
+            </MpPopoverContent>
+          </template>
+        </MpPopover>
+        <MpButton
+          v-else-if="toolbar.importKind"
+          variant="secondary"
+          @click="openImport(toolbar.importKind)"
+        >
+          Import
+        </MpButton>
+
+        <!-- Two product exports, not one: a bundle's rows are its components,
+             so it can't share a one-row-per-product sheet. Products opens the
+             column picker; bundles have a fixed shape and download straight
+             away. Other tabs export the list in front of the user, which needs
+             no choosing, so they get a button. -->
+        <MpPopover
+          v-if="toolbar.hasExportMenu"
+          placement="bottom-end"
+          use-portal
+          is-adaptive-width
+          is-close-on-select
+        >
+          <template #default>
+            <MpPopoverTrigger>
+              <MpButton variant="secondary" right-icon="caret-down">Export</MpButton>
+            </MpPopoverTrigger>
+            <MpPopoverContent>
+              <MpPopoverList>
+                <MpPopoverListItem role="menuitem" @click="isExportModalOpen = true">
+                  All products
+                </MpPopoverListItem>
+                <MpPopoverListItem role="menuitem" @click="exportBundles">
+                  Product bundles &amp; composition
+                </MpPopoverListItem>
+              </MpPopoverList>
+            </MpPopoverContent>
+          </template>
+        </MpPopover>
+        <MpButton v-else-if="toolbar.hasExport" variant="secondary" @click="exportCurrentTab">
+          Export
+        </MpButton>
+
+        <!-- Filter sits immediately LEFT of the search field, so the two
+             narrowing controls read as one pair with the file actions before
+             them (docs/patterns/FilterBar.md). -->
+        <div v-if="toolbar.hasFilter" :class="filterButtonWrapClass">
           <MpButton variant="secondary" left-icon="filter" @click="isFilterDrawerOpen = true">
             Filter
           </MpButton>
@@ -185,7 +306,8 @@
                the only place the user can see that a filter is still on. -->
           <span v-if="hasActiveFilter" :class="filterDotClass" aria-hidden="true" />
         </div>
-        <div :class="searchGroupClass">
+
+        <div :class="[searchGroupClass, toolbar.isWideSearch && wideSearchClass]">
           <MpInputGroup>
             <MpInputLeftAddon>
               <MpIcon name="search" size="sm" color="gray.400" />
@@ -356,82 +478,154 @@
           </MpTableBody>
 
           <MpTableBody v-else>
-            <MpTableRow v-for="row in pagedRows" :key="row.id">
-              <MpTableCell v-if="isSelectable" as="td" :class="checkboxCellClass">
-                <MpCheckbox :is-checked="selected.includes(row.id)" @change="toggleRow(row.id)" />
-              </MpTableCell>
-              <MpTableCell v-else as="td" :class="checkboxCellClass" />
+            <template v-for="row in pagedRows" :key="row.id">
+              <MpTableRow>
+                <MpTableCell v-if="isSelectable" as="td" :class="checkboxCellClass">
+                  <MpCheckbox :is-checked="selected.includes(row.id)" @change="toggleRow(row.id)" />
+                </MpTableCell>
+                <!-- The variant tab spends this column on the expander instead of
+                   a checkbox: the master is a header for the rows underneath
+                   it, not a record to select. -->
+                <MpTableCell v-else-if="row.isGroup" as="td" :class="checkboxCellClass">
+                  <MpButton
+                    variant="ghost"
+                    size="sm"
+                    :left-icon="isExpanded(row.id) ? 'caret-down' : 'caret-right'"
+                    :aria-label="`${isExpanded(row.id) ? 'Collapse' : 'Expand'} ${row.title}`"
+                    :aria-expanded="isExpanded(row.id)"
+                    @click="toggleExpanded(row.id)"
+                  />
+                </MpTableCell>
+                <MpTableCell v-else as="td" :class="checkboxCellClass" />
 
-              <MpTableCell
-                v-for="col in columns"
-                :key="col.key"
-                as="td"
-                :class="col.numeric ? numCellClass : undefined"
-              >
-                <!-- The link column: record name/number, an optional second
+                <MpTableCell
+                  v-for="col in columns"
+                  :key="col.key"
+                  as="td"
+                  :class="col.numeric ? numCellClass : undefined"
+                >
+                  <!-- The link column: record name/number, an optional second
                      line, and the row's markers (Variant / Bundle / Archived). -->
-                <template v-if="col.link">
-                  <!-- Rendered as a link only where a detail page exists — the
+                  <template v-if="col.link">
+                    <!-- Rendered as a link only where a detail page exists — the
                        four transaction tabs have no cloned detail route, and a
                        link that goes nowhere is worse than plain text. -->
-                  <MpTextlink
-                    v-if="hasDetailRoute"
-                    as="button"
-                    variant="primary"
-                    :class="linkCellClass"
-                    @click="onOpen(row)"
-                  >
-                    {{ row.title }}
-                  </MpTextlink>
-                  <span v-else :class="wrapCellClass">{{ row.title }}</span>
-                  <div v-if="row.badges.length" :class="badgeRowClass">
-                    <MpBadge
-                      v-for="badge in row.badges"
-                      :key="badge"
-                      for="additionalInformation"
-                      :type="BADGE_TYPE[badge]"
+                    <MpTextlink
+                      v-if="hasDetailRoute"
+                      as="button"
+                      variant="primary"
+                      :class="linkCellClass"
+                      @click="onOpen(row)"
                     >
-                      {{ BADGE_LABEL[badge] }}
+                      {{ row.title }}
+                    </MpTextlink>
+                    <span v-else :class="wrapCellClass">{{ row.title }}</span>
+                    <div v-if="row.badges.length" :class="badgeRowClass">
+                      <MpBadge
+                        v-for="badge in row.badges"
+                        :key="badge"
+                        for="additionalInformation"
+                        :type="BADGE_TYPE[badge]"
+                      >
+                        {{ BADGE_LABEL[badge] }}
+                      </MpBadge>
+                    </div>
+                    <MpText
+                      v-if="row.subtitle"
+                      size="body-small"
+                      color="gray.600"
+                      :class="wrapCellClass"
+                    >
+                      {{ row.subtitle }}
+                    </MpText>
+                  </template>
+                  <template v-else-if="col.key === 'status'">
+                    <MpBadge
+                      for="tableStatus"
+                      :type="ACTIVE_STATUS_TYPE[row.status as ActiveStatus]"
+                    >
+                      {{ ACTIVE_STATUS_LABEL[row.status as ActiveStatus] }}
                     </MpBadge>
-                  </div>
-                  <MpText
-                    v-if="row.subtitle"
-                    size="body-small"
-                    color="gray.600"
-                    :class="wrapCellClass"
-                  >
-                    {{ row.subtitle }}
-                  </MpText>
-                </template>
-                <template v-else-if="col.key === 'status'">
-                  <MpBadge for="tableStatus" :type="ACTIVE_STATUS_TYPE[row.status as ActiveStatus]">
-                    {{ ACTIVE_STATUS_LABEL[row.status as ActiveStatus] }}
-                  </MpBadge>
-                </template>
-                <template v-else-if="col.key === 'tags'">
-                  <MpText v-if="row.tags.length" size="body-small" :class="wrapCellClass">
-                    {{ row.tags.join(", ") }}
-                  </MpText>
-                  <MpText v-else size="body-small" color="gray.400">—</MpText>
-                </template>
-                <template v-else>
-                  <span :class="wrapCellClass">{{ cellText(row, col.key) }}</span>
-                </template>
-              </MpTableCell>
+                  </template>
+                  <template v-else-if="col.key === 'tags'">
+                    <MpText v-if="row.tags.length" size="body-small" :class="wrapCellClass">
+                      {{ row.tags.join(", ") }}
+                    </MpText>
+                    <MpText v-else size="body-small" color="gray.400">—</MpText>
+                  </template>
+                  <!-- A master carries no figures of its own — every number on
+                     this tab belongs to a variant — so its other cells stay
+                     empty rather than repeating a zero twelve times. -->
+                  <template v-else-if="row.isGroup" />
+                  <template v-else>
+                    <span :class="wrapCellClass">{{ cellText(row, col.key) }}</span>
+                  </template>
+                </MpTableCell>
 
-              <!-- Row action. Only the two approval queues have one, and it
+                <!-- Row action. Only the two approval queues have one, and it
                    gets its own fixed-width column rather than sharing the
                    width-less filler — the filler collapses to 0 as soon as the
                    columns fill the container, which would clip the button
                    exactly when the table starts scrolling. -->
-              <MpTableCell v-if="isApprovalTab" as="td">
-                <MpButton size="sm" variant="secondary" @click="openApproveModal([row.id])">
-                  Approve
-                </MpButton>
-              </MpTableCell>
-              <!-- Filler cell — matches the widthless trailing <col> above. -->
-              <MpTableCell as="td" />
-            </MpTableRow>
+                <MpTableCell v-if="isApprovalTab" as="td">
+                  <MpButton size="sm" variant="secondary" @click="openApproveModal([row.id])">
+                    Approve
+                  </MpButton>
+                </MpTableCell>
+                <!-- Filler cell — matches the widthless trailing <col> above. -->
+                <MpTableCell as="td" />
+              </MpTableRow>
+
+              <!-- The variants, in one full-width cell holding a nested table.
+                 A <tbody> can't be given its own scrollbar without dropping out
+                 of table layout and taking the column widths with it, so the
+                 scroll lives on a plain div and the nested table repeats this
+                 table's <colgroup> — with `table-layout: fixed` on both, the
+                 two align exactly. -->
+              <MpTableRow v-if="row.isGroup && isExpanded(row.id)">
+                <MpTableCell as="td" :colspan="colWidths.length + 1" :class="expansionCellClass">
+                  <div :class="expansionScrollClass" :data-variant-scroller="row.id">
+                    <MpTable :class="tableFixedClass">
+                      <colgroup>
+                        <col v-for="(w, i) in colWidths" :key="i" :style="{ width: w }" />
+                        <col />
+                      </colgroup>
+                      <MpTableBody>
+                        <MpTableRow v-for="variant in variantRowsFor(row.id)" :key="variant.id">
+                          <!-- Aligns under the expander, and carries the accent
+                             that ties the group together. -->
+                          <MpTableCell as="td" :class="[checkboxCellClass, variantAccentClass]" />
+                          <MpTableCell
+                            v-for="col in columns"
+                            :key="col.key"
+                            as="td"
+                            :class="col.numeric ? numCellClass : undefined"
+                          >
+                            <template v-if="col.link">
+                              <span :class="wrapCellClass">{{ variant.title }}</span>
+                              <div :class="badgeRowClass">
+                                <MpBadge
+                                  v-for="badge in variant.badges"
+                                  :key="badge"
+                                  for="additionalInformation"
+                                  :type="BADGE_TYPE[badge]"
+                                >
+                                  {{ BADGE_LABEL[badge] }}
+                                </MpBadge>
+                              </div>
+                            </template>
+                            <template v-else>
+                              <span :class="wrapCellClass">{{ cellText(variant, col.key) }}</span>
+                            </template>
+                          </MpTableCell>
+                          <MpTableCell as="td" />
+                        </MpTableRow>
+                      </MpTableBody>
+                    </MpTable>
+                  </div>
+                </MpTableCell>
+              </MpTableRow>
+            </template>
           </MpTableBody>
         </MpTable>
       </MpTableContainer>
@@ -513,6 +707,22 @@
       @close="isStorageDrawerOpen = false"
       @created="onStorageLocationCreated"
     />
+
+    <!-- A rename here rewrites the category on every product carrying it, so
+         the list underneath has to re-read after any change. -->
+    <ProductCategoryModal
+      :is-open="isCategoryModalOpen"
+      @close="isCategoryModalOpen = false"
+      @changed="refreshTick++"
+    />
+
+    <ProductImportModal
+      :is-open="isImportModalOpen"
+      :kind="importKind"
+      @close="isImportModalOpen = false"
+    />
+
+    <ProductExportModal :is-open="isExportModalOpen" @close="isExportModalOpen = false" />
   </DefaultPageContent>
 </template>
 
@@ -541,7 +751,6 @@ import {
   MpPopoverList,
   MpPopoverListItem,
   MpPopoverTrigger,
-  MpSelect,
   MpSkeleton,
   MpTab,
   MpTabList,
@@ -553,12 +762,23 @@ import {
   MpTableRow,
   MpTabs,
   MpText,
+  MpToggle,
   MpTextlink,
   MpTooltip
 } from "@mekari/pixel3";
 import DefaultPageContent from "~/components/template/DefaultPageContent.vue";
 import SummaryBox from "~/components/template/SummaryBox.vue";
 import ProductsFilterDrawer from "~/components/products/ProductsFilterDrawer.vue";
+import ProductCategoryModal from "~/components/products/ProductCategoryModal.vue";
+import ProductExportModal from "~/components/products/ProductExportModal.vue";
+import ProductImportModal from "~/components/products/ProductImportModal.vue";
+import { downloadCsv, toCsv } from "~/utils/csv";
+import {
+  BUNDLE_EXPORT_COLUMNS,
+  EXPORT_FILE_NAME,
+  IMPORT_GROUPS,
+  type ProductImportKind
+} from "~/data/products-io";
 import {
   emptyProductsFilter,
   isFilterActive,
@@ -571,11 +791,6 @@ import {
   ADJUSTMENT_TYPE_LABEL,
   APPROVAL_TYPE_LABEL,
   PRICE_RULE_TYPE_LABEL,
-  PRICE_RULE_TYPE_OPTIONS,
-  PRODUCT_CATEGORIES,
-  PRODUCT_TYPE_LABEL,
-  PRODUCT_TYPE_OPTIONS,
-  WAREHOUSE_OPTIONS,
   approveProductTransactions,
   approveWarehouseTransfers,
   archiveProducts,
@@ -597,11 +812,7 @@ import {
   ACTIVE_STATUS_LABEL,
   ACTIVE_STATUS_TYPE,
   priceRuleScopeSummary,
-  type ApprovalType,
-  type AdjustmentType,
-  type PriceRuleType,
-  type ActiveStatus,
-  type ProductType
+  type ActiveStatus
 } from "~/data/products";
 
 useHead({ title: "Products — Mekari Jurnal" });
@@ -615,10 +826,16 @@ useHead({ title: "Products — Mekari Jurnal" });
 // tabs, per docs/patterns/Tabs.md.
 //
 // UI-only prototype: no backend, no role/package gating (the source hides
-// price and quantity columns per role), no import/export pipeline, no paywall
-// or onboarding modals, no Mixpanel. What is ported is the shape of the
-// screens — segments, tabs, column sets, filter fields, the summary strip,
-// the bulk and approve actions, and the empty-state copy.
+// price and quantity columns per role), no paywall or onboarding modals, no
+// Mixpanel. What is ported is the shape of the screens — segments, tabs,
+// column sets, filter fields, the summary strip, the bulk and approve actions,
+// and the empty-state copy.
+//
+// Import and export are the exception: they produce real files, built in the
+// browser from the data in memory (app/utils/csv.ts), because the whole point
+// of both screens is the file and a prototype that hands back nothing
+// demonstrates neither. What is still missing is the other direction — nothing
+// reads an uploaded file back in.
 //
 // Detail and form routes (product detail, product form, master form, batch,
 // conversion, price-rule form) are a follow-up pass; the record links here are
@@ -669,6 +886,9 @@ const ACTION_GROUPS = computed<{ title: string; items: { key: string; label: str
     title: "Warehouse",
     items: [
       { key: "create-warehouse", label: "Add new warehouse" },
+      // In the menu rather than the title band: the band is the Actions button
+      // and nothing else, as the source has it.
+      { key: "warehouse-settings", label: "Warehouse settings" },
       // Hidden while the storage-location feature is off: with no locations
       // anywhere, the entry leads to a drawer that can't save anything.
       ...(isStorageLocationFeatureActive()
@@ -695,6 +915,7 @@ type ColumnKey =
   | "unit"
   | "variantCount"
   | "lastBuyPrice"
+  | "avgPrice"
   | "buyPrice"
   | "sellPrice"
   | "date"
@@ -727,10 +948,12 @@ interface ColumnDef {
   link?: boolean;
 }
 
-// Per-tab column sets. The product list's set is the source's default-ON
-// columns from `defaultProductCols` — its Product image, Average price and
-// Total-product-in-warehouse columns default to off behind the column picker,
-// which isn't ported (see app/data/products.ts).
+// Per-tab column sets. The product list's set is the source's `defaultProductCols`
+// plus Average price, which the source ships default-off behind the column
+// picker — see DEFAULT_HIDDEN_COLUMNS. Its Product image and
+// Total-product-in-warehouse columns have no data behind them here (no image
+// storage, no per-warehouse stock breakdown on a product row), so they are not
+// offered rather than offered empty.
 const COLUMNS_BY_TAB: Record<ProductsTabKey, ColumnDef[]> = {
   products_and_services: [
     { key: "productName", label: "Product name", link: true },
@@ -742,16 +965,24 @@ const COLUMNS_BY_TAB: Record<ProductsTabKey, ColumnDef[]> = {
     { key: "buffer", label: "Minimum stock", numeric: true },
     { key: "unit", label: "Unit" },
     { key: "lastBuyPrice", label: "Last buy price", numeric: true },
+    { key: "avgPrice", label: "Average price", numeric: true },
     { key: "buyPrice", label: "Buy price", numeric: true },
     { key: "sellPrice", label: "Sell price", numeric: true }
   ],
+  // The same set as the product list: this tab's figures live on the variants,
+  // and a variant carries everything a product does. The master row itself is a
+  // group header — it renders its name and nothing else (see `isGroup`).
   masters: [
     { key: "productName", label: "Product name", link: true },
     { key: "productCode", label: "Product code" },
+    { key: "barcode", label: "Barcode" },
     { key: "productCategory", label: "Product category" },
-    { key: "variantCount", label: "Variant", numeric: true },
     { key: "quantity", label: "Total stock", numeric: true },
+    { key: "quantityAvailable", label: "Available qty", numeric: true },
+    { key: "buffer", label: "Minimum stock", numeric: true },
     { key: "unit", label: "Unit" },
+    { key: "avgPrice", label: "Average price", numeric: true },
+    { key: "lastBuyPrice", label: "Last buy price", numeric: true },
     { key: "buyPrice", label: "Buy price", numeric: true },
     { key: "sellPrice", label: "Sell price", numeric: true }
   ],
@@ -834,6 +1065,9 @@ interface Row extends FilterableProductRow {
   title: string;
   /** Optional second line under the title. */
   subtitle: string;
+  /** A master on the variant tab: a header for the variants underneath it, not
+   *  a record with figures of its own. Renders its name and nothing else. */
+  isGroup?: boolean;
   badges: RowBadge[];
   code: string;
   barcode: string;
@@ -844,6 +1078,7 @@ interface Row extends FilterableProductRow {
   unit: string;
   variantCount: number;
   lastBuyPrice: number;
+  avgPrice: number;
   buyPrice: number;
   sellPrice: number;
   account: string;
@@ -875,6 +1110,7 @@ function emptyRow(id: number): Row {
     unit: "",
     variantCount: 0,
     lastBuyPrice: 0,
+    avgPrice: 0,
     buyPrice: 0,
     sellPrice: 0,
     account: "",
@@ -919,6 +1155,7 @@ function rowsForTab(tab: ProductsTabKey): Row[] {
         buffer: p.buffer,
         unit: p.unit,
         lastBuyPrice: p.lastBuyPrice,
+        avgPrice: p.avgPrice,
         buyPrice: p.buyPrice,
         sellPrice: p.sellPrice,
         searchText: [p.name, p.code, p.barcode, p.category, p.description, ...p.tags],
@@ -931,15 +1168,10 @@ function rowsForTab(tab: ProductsTabKey): Row[] {
     case "masters":
       return getProductMasters().map((m) => ({
         ...emptyRow(m.id),
+        isGroup: true,
         title: m.name,
         subtitle: m.description,
-        badges: ["variant" as RowBadge, ...(m.isArchived ? (["archived"] as RowBadge[]) : [])],
-        code: m.code,
-        quantity: m.quantity,
-        unit: m.unit,
-        variantCount: m.variantCount,
-        buyPrice: m.buyPrice,
-        sellPrice: m.sellPrice,
+        badges: m.isArchived ? (["archived"] as RowBadge[]) : [],
         searchText: [m.name, m.code, m.category, m.description, ...m.tags],
         category: m.category,
         tags: m.tags,
@@ -973,19 +1205,23 @@ function rowsForTab(tab: ProductsTabKey): Row[] {
         tags: a.tags
       }));
     case "warehouses":
-      return getWarehouses().map((w) => ({
-        ...emptyRow(w.id),
-        title: w.name,
-        code: w.code,
-        address: w.address,
-        // Several people can share a warehouse; the column shows them as one
-        // line, which is what a list column can carry.
-        pic: w.pics.join(", "),
-        description: w.description,
-        searchText: [w.code, w.name, w.address, ...w.pics, w.description],
-        warehouse: w.name,
-        status: w.isActive ? "active" : "inactive"
-      }));
+      // Inactive warehouses are out of the list unless the toggle asks for
+      // them — the source's default, and why this tab has no status filter.
+      return getWarehouses()
+        .filter((w) => showInactiveWarehouses.value || w.isActive)
+        .map((w) => ({
+          ...emptyRow(w.id),
+          title: w.name,
+          code: w.code,
+          address: w.address,
+          // Several people can share a warehouse; the column shows them as one
+          // line, which is what a list column can carry.
+          pic: w.pics.join(", "),
+          description: w.description,
+          searchText: [w.code, w.name, w.address, ...w.pics, w.description],
+          warehouse: w.name,
+          status: w.isActive ? "active" : "inactive"
+        }));
     case "warehouse_transfers":
     case "warehouse_transfers_approval":
       return (
@@ -1031,36 +1267,40 @@ function rowsForTab(tab: ProductsTabKey): Row[] {
 
 // ---- Quick filters ------------------------------------------------------
 //
-// The selects on the left of the filter bar. They write into the same
-// `filter` object the drawer stages, so the bar and the drawer can never
-// disagree about what is applied (docs/patterns/FilterBar.md).
+// Per-tab toolbar. Each tab gets only the controls that act on its own list —
+// the set the source gives it — rather than a fixed bar that would be inert on
+// most of the eight.
 
-type QuickFilterKey =
-  | "category"
-  | "productType"
-  | "transactionType"
-  | "warehouse"
-  | "status"
-  | "ruleType";
+interface ToolbarSpec {
+  hasColumnPicker?: boolean;
+  hasManageCategory?: boolean;
+  /** "menu" for the product list's three imports; a kind for a single import. */
+  importKind?: "menu" | ProductImportKind;
+  /** The product list's two-entry Export menu. */
+  hasExportMenu?: boolean;
+  /** A plain Export of the rows in front of the user. */
+  hasExport?: boolean;
+  hasInactiveToggle?: boolean;
+  hasFilter?: boolean;
+  /** Price rules has no other control, so its search takes the room. */
+  isWideSearch?: boolean;
+}
 
-const QUICK_FILTERS_BY_TAB: Record<ProductsTabKey, QuickFilterKey[]> = {
-  products_and_services: ["category", "productType"],
-  masters: ["category"],
-  stock_adjustments: ["transactionType", "warehouse"],
-  product_index_approval: ["transactionType"],
-  warehouses: ["status"],
-  warehouse_transfers: ["warehouse"],
-  warehouse_transfers_approval: ["warehouse"],
-  price_rules: ["ruleType", "status"]
-};
-
-const QUICK_FILTER_ALL_LABEL: Record<QuickFilterKey, string> = {
-  category: "All categories",
-  productType: "All types",
-  transactionType: "All types",
-  warehouse: "All warehouses",
-  status: "All status",
-  ruleType: "All rule types"
+const TOOLBAR_BY_TAB: Record<ProductsTabKey, ToolbarSpec> = {
+  products_and_services: {
+    hasColumnPicker: true,
+    hasManageCategory: true,
+    importKind: "menu",
+    hasExportMenu: true,
+    hasFilter: true
+  },
+  masters: { hasColumnPicker: true },
+  stock_adjustments: { hasExport: true, hasFilter: true },
+  product_index_approval: { hasFilter: true },
+  warehouses: { hasInactiveToggle: true, importKind: "warehouse-create" },
+  warehouse_transfers: { importKind: "transfer-create" },
+  warehouse_transfers_approval: { importKind: "transfer-create" },
+  price_rules: { isWideSearch: true }
 };
 
 // ---- Page state ---------------------------------------------------------
@@ -1108,8 +1348,30 @@ const activeTabKey = computed<ProductsTabKey>(
   () => tabs.value[activeTabIndex.value]?.key ?? tabs.value[0]!.key
 );
 
-const columns = computed(() => COLUMNS_BY_TAB[activeTabKey.value]);
-const quickFilters = computed(() => QUICK_FILTERS_BY_TAB[activeTabKey.value]);
+/**
+ * Columns the picker starts with unticked.
+ *
+ * Average price is the source's default-off column and the reason the picker
+ * exists at all: it is the twelfth column on an already-scrolling table, and
+ * only a stock controller reconciling inventory value wants it.
+ */
+const DEFAULT_HIDDEN_COLUMNS: ColumnKey[] = ["avgPrice"];
+
+// Held across tabs, and only ever populated with keys of a tab that has a
+// picker. An array rather than a Set: it is read in the template on every
+// render, and a Set mutated in place wouldn't re-trigger it.
+const hiddenColumns = ref<ColumnKey[]>([...DEFAULT_HIDDEN_COLUMNS]);
+
+function toggleColumn(key: ColumnKey, isChecked: boolean) {
+  hiddenColumns.value = isChecked
+    ? hiddenColumns.value.filter((hidden) => hidden !== key)
+    : [...hiddenColumns.value, key];
+}
+
+const columns = computed(() =>
+  COLUMNS_BY_TAB[activeTabKey.value].filter((column) => !hiddenColumns.value.includes(column.key))
+);
+const toolbar = computed(() => TOOLBAR_BY_TAB[activeTabKey.value]);
 
 // The strip counts products and warehouses, both of which the first two
 // segments are about. Price rules have nothing to do with stock levels, so the
@@ -1123,16 +1385,154 @@ const isApprovalTab = computed(
 );
 // Approval queues are acted on one row at a time (Approve), so they carry no
 // checkbox column — the same call the Purchase list's "Need approval" tab makes.
-const isSelectable = computed(() => !isApprovalTab.value);
+// The variant tab has none either: its first column is the expander, and its
+// rows are group headers rather than records to act on in bulk.
+const isSelectable = computed(() => !isApprovalTab.value && !isGroupedTab.value);
+
+/** The variant tab: master rows that expand to the variants underneath them. */
+const isGroupedTab = computed(() => activeTabKey.value === "masters");
+
+// Which masters are open. Reset on tab change with everything else scoped to
+// one list, so switching away and back doesn't restore a stale expansion.
+const expandedIds = ref<number[]>([]);
+
+function isExpanded(id: number) {
+  return expandedIds.value.includes(id);
+}
+
+async function toggleExpanded(id: number) {
+  const opening = !isExpanded(id);
+  expandedIds.value = opening
+    ? [...expandedIds.value, id]
+    : expandedIds.value.filter((x) => x !== id);
+  if (opening) {
+    await nextTick();
+    capExpansionHeight(id);
+  }
+}
+
+/**
+ * Clip the group after MAX_EXPANDED_ROWS and let the rest scroll.
+ *
+ * The cut has to land exactly on a row boundary, and a variant row's height
+ * isn't knowable up front — it depends on whether the name wraps — so the
+ * height is measured from the rendered rows rather than guessed at in css().
+ * Written to `style.maxHeight` for the same reason the <colgroup> widths are
+ * inline: it is a value only layout can supply.
+ */
+function capExpansionHeight(id: number) {
+  const scroller = document.querySelector<HTMLElement>(`[data-variant-scroller="${id}"]`);
+  if (!scroller) return;
+  const rows = scroller.querySelectorAll<HTMLElement>("tbody tr");
+  if (rows.length <= MAX_EXPANDED_ROWS) {
+    scroller.style.maxHeight = "";
+    return;
+  }
+  const last = rows[MAX_EXPANDED_ROWS - 1]!;
+  scroller.style.maxHeight = `${last.offsetTop + last.offsetHeight}px`;
+}
+
+/**
+ * One row per variant of a master, in the same shape the table's cells read.
+ *
+ * Built here rather than folded into `rowsForTab` because variants are not
+ * rows of this list: they never paginate, never sort and never match the
+ * filter on their own — they exist only underneath the master that owns them.
+ */
+function variantRowsFor(masterId: number): Row[] {
+  const master = getProductMasters().find((m) => m.id === masterId);
+  if (!master) return [];
+  return master.variants.map((variant) => ({
+    ...emptyRow(variant.id),
+    title: variant.name,
+    badges: ["variant" as RowBadge, ...(master.isArchived ? (["archived"] as RowBadge[]) : [])],
+    code: variant.code,
+    barcode: variant.barcode,
+    quantity: variant.quantity,
+    quantityAvailable: variant.quantityAvailable,
+    buffer: variant.buffer,
+    unit: master.unit,
+    buyPrice: variant.buyPrice,
+    sellPrice: variant.sellPrice,
+    category: master.category
+  }));
+}
 const canArchive = computed(
   () => activeTabKey.value === "products_and_services" || activeTabKey.value === "masters"
 );
 
+const isCategoryModalOpen = ref(false);
+const isImportModalOpen = ref(false);
+const isExportModalOpen = ref(false);
+const importKind = ref<ProductImportKind>("single-create");
+
+function openImport(kind: ProductImportKind) {
+  importKind.value = kind;
+  isImportModalOpen.value = true;
+}
+
+/**
+ * The bundle export has no column picker: a bundle's own fields are few, and
+ * the rows are its components, so there is nothing to choose. One row per
+ * component, with the bundle's columns repeated — the flat-file shape for a
+ * nested record.
+ */
+function exportBundles() {
+  const rows = getProducts()
+    .filter((product) => product.isBundle)
+    .flatMap((bundle) =>
+      bundle.bundleItems.map((item) => [
+        bundle.name,
+        bundle.code,
+        bundle.category,
+        formatAmount(bundle.sellPrice),
+        item.name,
+        formatQuantity(item.quantity)
+      ])
+    );
+  downloadCsv(EXPORT_FILE_NAME.bundles, toCsv(BUNDLE_EXPORT_COLUMNS, rows));
+}
+
+/**
+ * Export the list the user is looking at, using its own visible columns.
+ *
+ * There is nothing to choose here — a transaction list has one shape — so this
+ * tab's Export is a button, not a modal. It writes the filtered, sorted rows
+ * rather than the whole table: the file should be the list on screen.
+ */
+function exportCurrentTab() {
+  const visible = columns.value;
+  const rows = filteredRows.value.map((row) =>
+    visible.map((column) => (column.link ? row.title : cellText(row, column.key)))
+  );
+  downloadCsv(
+    `${activeTabKey.value.replace(/_/g, "-")}.csv`,
+    toCsv(
+      visible.map((column) => column.label),
+      rows
+    )
+  );
+}
+
+/**
+ * The warehouse list's own switch, in place of a status filter.
+ *
+ * A deactivated warehouse is hidden rather than filtered out — it still holds
+ * stock and still appears on old movements — so the question the list asks is
+ * "show them too?" rather than "which status?".
+ */
+const showInactiveWarehouses = ref(false);
+
+function onToggleInactiveWarehouses(isChecked: boolean) {
+  showInactiveWarehouses.value = isChecked;
+  page.value = 1;
+  selected.value = [];
+}
+
 const isFilterDrawerOpen = ref(false);
 // One object, not loose refs: the drawer stages a copy of exactly this shape
-// and Apply swaps it in. The search box and the quick selects edit its fields
-// directly — they are shortcuts into the same filter, not a second one layered
-// on top.
+// and Apply swaps it in. The search box edits its `key` field directly — a
+// shortcut into the same filter, not a second one layered on top.
 const filter = ref<ProductsFilter>(emptyProductsFilter());
 const search = computed({
   get: () => filter.value.key,
@@ -1160,58 +1560,19 @@ const searchPlaceholder = computed(() => {
     case "products_and_services":
       return "Search product";
     case "masters":
-      return "Search product with variant";
+      // "Search product", not "Search product with variant": the tab already
+      // says which list this is, and the source uses the shorter one.
+      return "Search product";
     case "warehouses":
       return "Search warehouse";
     case "price_rules":
-      return "Search price rule";
+      // The source's own placeholder. This tab has no other control, so the
+      // field is wide and unlabelled by anything around it.
+      return "Search...";
     default:
       return "Search transaction";
   }
 });
-
-function quickFilterOptions(key: QuickFilterKey): { value: string; label: string }[] {
-  switch (key) {
-    case "category":
-      return PRODUCT_CATEGORIES.map((c) => ({ value: c, label: c }));
-    case "productType":
-      return PRODUCT_TYPE_OPTIONS.map((t: ProductType) => ({
-        value: t,
-        label: PRODUCT_TYPE_LABEL[t]
-      }));
-    case "transactionType":
-      return activeTabKey.value === "stock_adjustments"
-        ? (Object.keys(ADJUSTMENT_TYPE_LABEL) as AdjustmentType[]).map((t) => ({
-            value: t,
-            label: ADJUSTMENT_TYPE_LABEL[t]
-          }))
-        : (Object.keys(APPROVAL_TYPE_LABEL) as ApprovalType[]).map((t) => ({
-            value: t,
-            label: APPROVAL_TYPE_LABEL[t]
-          }));
-    case "warehouse":
-      return WAREHOUSE_OPTIONS.map((w) => ({ value: w, label: w }));
-    case "ruleType":
-      return PRICE_RULE_TYPE_OPTIONS.map((t: PriceRuleType) => ({
-        value: t,
-        label: PRICE_RULE_TYPE_LABEL[t]
-      }));
-    case "status":
-      return [
-        { value: "active", label: "Active" },
-        { value: "inactive", label: "Inactive" }
-      ];
-  }
-}
-
-// MpSelect's clear emits `undefined`, so coalesce before writing it back —
-// the filter's fields are strings, and an undefined would make every
-// `f.category && …` check pass with a non-string.
-function setQuickFilter(key: QuickFilterKey, value: unknown) {
-  filter.value[key] = typeof value === "string" ? value : "";
-  page.value = 1;
-  selected.value = [];
-}
 
 const tableContainerRef = ref<{ $el?: HTMLElement } | HTMLElement | null>(null);
 
@@ -1221,6 +1582,7 @@ function resetForTabChange() {
   page.value = 1;
   selected.value = [];
   sortKey.value = null;
+  expandedIds.value = [];
   // The tabs hold different entities, so a filter carried across could be
   // narrowing by a control the new tab doesn't even show.
   filter.value = emptyProductsFilter();
@@ -1314,6 +1676,8 @@ function cellText(row: Row, key: ColumnKey): string {
       return formatCount(row.variantCount);
     case "lastBuyPrice":
       return formatAmount(row.lastBuyPrice);
+    case "avgPrice":
+      return formatAmount(row.avgPrice);
     case "buyPrice":
       return formatAmount(row.buyPrice);
     case "sellPrice":
@@ -1507,7 +1871,8 @@ const ACTION_ROUTES: Record<string, string> = {
   "create-warehouse": "/products/warehouse/new",
   "stock-count": "/products/stock-adjustment/new?type=stock_count",
   "warehouse-transfer": "/products/warehouse-transfer/new",
-  "create-price-rule": "/products/price-rules/new"
+  "create-price-rule": "/products/price-rules/new",
+  "warehouse-settings": "/products/warehouse/settings"
 };
 
 const isStorageDrawerOpen = ref(false);
@@ -1614,6 +1979,7 @@ const COLUMN_WIDTH: Record<ColumnKey, number> = {
   // Money columns carry two decimals ("1.690.000,00"), so they need ~30px
   // more than a bare integer would.
   lastBuyPrice: 160,
+  avgPrice: 160,
   buyPrice: 150,
   sellPrice: 150,
   date: 120,
@@ -1733,7 +2099,19 @@ const searchClearClass = css({
   cursor: "pointer",
   lineHeight: "0"
 });
-const quickFilterClass = css({ width: "180px" });
+// Price rules carries nothing but a search box, so the field takes the room
+// the other tabs give to their file actions and Filter.
+const wideSearchClass = css({ width: "360px!" });
+// The column picker's body. Padded like MpPopoverList (which this isn't — its
+// rows are checkboxes, not menu items that dismiss on click).
+const columnMenuClass = css({
+  display: "flex",
+  flexDirection: "column",
+  gap: 3,
+  px: 4,
+  py: 3,
+  minWidth: "220px"
+});
 
 // Pure-CSS horizontal scroll affordance. The two `local` white gradients ride
 // with the content and scroll away; the two `scroll` shadows stay pinned to the
@@ -1800,6 +2178,23 @@ const wrapCellClass = css(wrapCellBase);
 // style (both silently do nothing). See docs/patterns/TablePage.md.
 const linkCellClass = css({ ...wrapCellBase, ml: "-2px", mr: "-2px" });
 const badgeRowClass = css({ display: "flex", flexWrap: "wrap", gap: 1, mt: 1 });
+
+// ---- The variant tab's expanded group -----------------------------------
+
+/** Five variant rows, then the group scrolls — the point where a group stops
+ *  being something you can take in at a glance and starts pushing the next
+ *  master off screen. The pixel height is measured, not assumed: see
+ *  `capExpansionHeight`. */
+const MAX_EXPANDED_ROWS = 5;
+
+// The cell is only a container for the scroller: no padding, so the nested
+// table's own cell padding is the only padding, and its rows line up with the
+// outer table's.
+const expansionCellClass = css({ p: "0!", bg: "gray.25" });
+const expansionScrollClass = css({ overflowY: "auto" });
+// The accent down the left of the group, drawn on the cell that sits under the
+// expander so it reads as one block rather than a run of loose rows.
+const variantAccentClass = css({ boxShadow: "inset 3px 0 0 0 var(--mp-colors-blue-400)" });
 
 const sortHeaderClass = css({
   display: "flex",

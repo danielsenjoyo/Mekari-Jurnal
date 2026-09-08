@@ -118,11 +118,12 @@ export interface ProductsFilterFields {
 }
 
 export const FILTER_FIELDS_BY_TAB: Record<ProductsTabKey, ProductsFilterFields> = {
+  // No warehouse or tag filter: this list has no `Warehouse` quick sense on
+  // it (a product's stock spans warehouses, unlike a transaction), and its
+  // tag set is thin enough that Keyword already covers it.
   products_and_services: {
     category: true,
     productType: true,
-    warehouse: true,
-    tags: true,
     showArchived: true
   },
   // A master has no stock of its own (its variants hold it), so no warehouse.
