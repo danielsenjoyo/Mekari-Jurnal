@@ -1,10 +1,5 @@
 <template>
-  <MpModal
-    id="product-export-modal"
-    :is-open="isOpen"
-    size="lg"
-    @close="emit('close')"
-  >
+  <MpModal id="product-export-modal" :is-open="isOpen" size="lg" @close="emit('close')">
     <MpModalOverlay />
     <MpModalContent>
       <MpModalHeader>
