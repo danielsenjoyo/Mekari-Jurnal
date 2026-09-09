@@ -240,10 +240,6 @@ Putting a module's records in a table with a TOTAL row surfaces things no
 detail page does. Two defects in the Sales fixture were found this way, both
 pre-dating the reports:
 
-- **`discountPerLines` was hardcoded to `0`** while `buildLines()` was handing
-  out 10% line discounts, so Gross Amount equalled the subtotal and Discount
-  Amount read `0,00` on every row of a layout that offers the column. It is now
-  the real gap between list value and what was charged.
 - **A join invoice's status was independent of its balance**, because the
   linking pass overwrites the figures but left the generator's status alone —
   so the Join invoice list showed `Paid` rows carrying their full balance due.
@@ -251,8 +247,46 @@ pre-dating the reports:
   awaiting-approval records, whose status describes where the document sits in
   the approval flow rather than what is owed on it.
 
-Both were invisible until two columns sat next to each other. **When a new
+It was invisible until two columns sat next to each other. **When a new
 report's numbers look wrong, suspect the fixture before the projection.**
+
+### The subtotal disagreement — known, unfixed
+
+**`Discount Amount` reads `0,00` on every row of every list report, in both
+modules.** It is not a broken column; it is an honest reading of a fixture that
+contradicts itself, and the fix is bigger than it looks.
+
+`buildLines()` gives roughly one line in six a 10% discount, and `line.amount`
+is net of it. But the generator then stores `subtotal` as the **net** line
+value with `discountPerLines: 0`, while `computeTransactionTotals` — the form's
+model of the very same record — returns `subtotal: gross` with
+`discountPerLines = gross − net`. The two have always disagreed about what
+`subtotal` means. `discountPerLines: 0` is what hides it.
+
+Populating `discountPerLines` alone is **not** the fix, and was tried: the
+detail pages render their discount row under `v-if="discountPerLines > 0"`, so
+filling it in makes a deduction row appear beneath a Subtotal that is already
+net of that deduction — and `total` doesn't subtract it either. The totals
+column stops adding up on six Sales detail pages.
+
+**`depositAmount` is the same disagreement in a second place.** The generator
+computes `balanceDue = total − amountReceived` and leaves the deposit out of it;
+the form's `computeTransactionTotals` returns
+`balanceDue = total − withholding − deposit`. So an invoice detail page can show
+"Deposit received Rp2.454.432" directly above a Balance due of the full total —
+the customer paid, and still appears to owe everything. Both predate the reports
+(`bde8b1a`); the Sales list's Deposit column just puts the two figures on one
+screen for the first time.
+
+The actual fix is to make the generator agree with the form: store
+`subtotal: gross`, deduct the deposit in `balanceDue`, keep tax and `total`
+computed from net (so no figure moves),
+and update the report projection to `grossAmount: t.subtotal` instead of
+`subtotal + discounts`. That means the return-recompute passes, the join-invoice
+and pro-forma-order linking passes, and the same set again in
+`purchase-transactions.ts` — Purchases carries the identical latent defect. It
+is a fixture money-model change deserving its own pass and its own verification
+across every detail page in both modules, not a rider on a reports branch.
 
 ## What is shared and what is mirrored
 

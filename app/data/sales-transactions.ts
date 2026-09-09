@@ -418,14 +418,13 @@ function buildTransaction(type: TransactionType, i: number, seq: number): SalesT
       : pool[i % pool.length]!;
 
   const lines = buildLines(seq);
+  // NOTE: this is the **net** line value, and `computeTransactionTotals` — the
+  // form's model of the same record — returns `subtotal: gross` instead. The
+  // two disagree, and have since both were written. See
+  // `docs/patterns/reports-page-format.md` § The subtotal disagreement before
+  // changing either: populating `discountPerLines` here without also switching
+  // this to gross makes the detail pages' totals column stop adding up.
   const subtotal = lines.reduce((sum, l) => sum + l.amount, 0);
-  // What the per-line discounts took off. `line.amount` is already net of
-  // them, so this is the gap between list value and what was charged — the
-  // figure `discountPerLines` is defined as, and the one the reports' Gross
-  // Amount and Discount Amount columns are derived from. It was hardcoded to
-  // 0 while buildLines() was handing out 10% discounts, which left Discount
-  // Amount reading 0,00 on every row of a report that offers the column.
-  const discountPerLines = lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0) - subtotal;
   const taxAmount = Math.round(subtotal * TAX_RATE);
   const total = subtotal + taxAmount;
 
@@ -489,10 +488,11 @@ function buildTransaction(type: TransactionType, i: number, seq: number): SalesT
     currency: "IDR",
     priceIncludesTax: false,
     subtotal,
-    // Generated records have no transaction-*level* discount or withholding —
-    // those only arrive from the create/edit form. The per-line discounts
-    // above are real, though.
-    discountPerLines,
+    // Generated records have no transaction-level discount or withholding —
+    // those only arrive from the create/edit form. `discountPerLines` stays 0
+    // for now even though `buildLines()` does hand out line discounts: see the
+    // note on `subtotal` above.
+    discountPerLines: 0,
     discountType: "percent" as DiscountType,
     discountValue: 0,
     discountAmount: 0,
