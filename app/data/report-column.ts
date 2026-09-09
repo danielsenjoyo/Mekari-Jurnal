@@ -22,10 +22,12 @@ export interface ReportColumn<K extends string = string> {
   width: number;
   /**
    * How the value is written. `money` uses the Purchases module's
-   * `formatAmount`; `number` is a plain count or quantity; `date` takes an ISO
+   * `formatAmount`; `number` is a plain count or quantity; `percent` is a
+   * figure already expressed out of 100, written to one decimal so a column of
+   * them lines up (`18,0` beside `19,5`, never `18`); `date` takes an ISO
    * string. Anything else is text.
    */
-  format?: "money" | "number" | "date";
+  format?: "money" | "number" | "percent" | "date";
   /** Defaults to right for `money` and `number`, left otherwise. */
   align?: "left" | "right";
   /**
@@ -54,10 +56,15 @@ export interface ReportLayout<K extends string = string> {
 /** Whether a column's cells sit right of centre. */
 export function isRightAligned(col: ReportColumn): boolean {
   if (col.align) return col.align === "right";
-  return col.format === "money" || col.format === "number";
+  return col.format === "money" || col.format === "number" || col.format === "percent";
 }
 
-/** Whether a column contributes a figure to the TOTAL row. */
+/**
+ * Whether a column contributes a figure to the TOTAL row. Defaults to true for
+ * `money` only — a `percent` column never totals by default, because the
+ * report's overall percentage is recomputed from its two source columns, not
+ * summed or averaged down the one on screen.
+ */
 export function isTotalled(col: ReportColumn): boolean {
   return col.total ?? col.format === "money";
 }

@@ -3,7 +3,7 @@
 > A **report** screen: pick a date range and criteria, press a button, read a
 > table with a TOTAL row. Looks like an index page and isn't one.
 > Reference impl: [`app/pages/reports/purchases_list.vue`](../../app/pages/reports/purchases_list.vue)
-> — the other nine reports (four Purchases, five Sales) are the same five
+> — the other ten reports (four Purchases, six Sales) are the same five
 > components with different columns.
 > Shared chrome: [`ReportFilterBar`](../../app/components/reports/ReportFilterBar.vue),
 > [`ReportTable`](../../app/components/reports/ReportTable.vue),
@@ -65,18 +65,20 @@ through to the default.
 | Purchase by product       | one **product**, aggregated         | Filter applies per transaction, not per row     |
 | Purchase order completion | one order                           | Links order → its delivery                      |
 
-## The five Sales reports
+## The six Sales reports
 
-The AR mirror of the table above, one for one — same five shapes, same five
-components, `vendorName` → `customerName`:
+The first five are the AR mirror of the table above, one for one — same five
+shapes, same five components, `vendorName` → `customerName`. Product
+profitability has no AP counterpart:
 
-| Report                 | Rows are                            | Notable                                                      |
-| ---------------------- | ----------------------------------- | ------------------------------------------------------------ |
-| Sales list             | one transaction                     | 3 column layouts (Template ▾), sortable headers, **Deposit** |
-| Sales by customer      | one **line item**, customer-ordered | Sort by customer / total sales                               |
-| Sales delivery         | one delivery, or one delivered line | **Group by** switches columns _and_ row grain                |
-| Sales by product       | one **product**, aggregated         | Filter applies per transaction, not per row                  |
-| Sales order completion | one order                           | Links order → its delivery                                   |
+| Report                 | Rows are                            | Notable                                                        |
+| ---------------------- | ----------------------------------- | -------------------------------------------------------------- |
+| Sales list             | one transaction                     | 3 column layouts (Template ▾), sortable headers, **Deposit**   |
+| Sales by customer      | one **line item**, customer-ordered | Sort by customer / total sales                                 |
+| Sales delivery         | one delivery, or one delivered line | **Group by** switches columns _and_ row grain                  |
+| Sales by product       | one **product**, aggregated         | Filter applies per transaction, not per row                    |
+| Sales order completion | one order                           | Links order → its delivery                                     |
+| Product profitability  | one **product** sold, aggregated    | **Reads both ledgers** — sales for revenue, purchases for cost |
 
 Two things are genuinely Sales', not a find-and-replace:
 
@@ -93,6 +95,45 @@ And one omission worth naming: production's Sales order completion has a
 quotation in this dataset carries no link to the order it became, so quote-first
 would render a table whose Order, Invoice and Payment columns were empty on
 every row — the same rule that dropped Payment from the Purchases version.
+
+## The one report that reads both ledgers
+
+Product profitability needs revenue _and_ cost, so it is the only report that
+crosses modules: sales invoices give gross sales, and the Purchases ledger
+gives the cost basis. Three decisions in
+[`buildProfitabilityRows`](../../app/data/sales-report-variants.ts) are worth
+knowing.
+
+**COGS is the weighted average purchase price, not a costing engine.**
+Production computes cost per sale from FIFO or moving-average inventory
+valuation — which is why its page carries a recalculation banner. Here the cost
+basis is the average unit price actually paid across every purchase invoice for
+that product, which is also exactly what the report's own Avg Buy Price column
+shows, so the two can never disagree. It lands below list price because
+purchase lines carry discounts.
+
+**The cost basis ignores the report's date range.** Stock sold this quarter was
+generally bought before it, so a windowed cost basis would report 100% margin
+on every product whose purchases fell outside the window.
+
+**Margin is profit over revenue, not over cost** — something sold at twice its
+cost is a 50% margin, not 100% — and the TOTAL row leaves that cell empty. The
+report's overall margin is total profit over total gross sales, which is neither
+the sum nor the average of the per-product margins; that's what
+`format: "percent"` defaulting to `total: false` is for.
+
+### The fixture has to have a margin in it
+
+The two modules keep separate `PRODUCT_OPTIONS`: `sales-transactions.ts` is the
+**sell-side** list, `purchase-transactions.ts` the **buy-side** one. They were
+briefly identical — the company bought and sold everything at the same price —
+and this report was a page of `0,00` and `0%`. The sales list now carries a
+per-product markup of roughly 20–45%.
+
+**If you edit either list, keep sell above buy, and keep the markups uneven.**
+Equal prices make the report meaningless; one flat markup makes every row rank
+the same, which is worse than it sounds for a report whose job is to say what to
+sell more of.
 
 ## What is shared and what is mirrored
 
@@ -190,10 +231,14 @@ vanish when the drawer closes. A dot that's always lit says nothing.
 carries a fixed px `width`, a `format`, and two derived behaviours worth
 knowing:
 
-- **`format`** — `money`, `number`, `date`, or text. `money` uses the Purchases
-  module's `formatAmount`; never hand-roll a formatter in a report.
-- **`align`** defaults to right for `money` and `number`.
-- **`total`** defaults to true for `money` only. Override it in both
+- **`format`** — `money`, `number`, `percent`, `date`, or text. `money` uses the
+  Purchases module's `formatAmount`; never hand-roll a formatter in a report.
+  `percent` is a figure already out of 100, written to exactly one decimal so a
+  column of them lines up (`18,0` under `19,5`, never `18`) — put the `%` in the
+  column head, not the cell.
+- **`align`** defaults to right for `money`, `number` and `percent`.
+- **`total`** defaults to true for `money` only — a `percent` column therefore
+  opts out by default. Override it in both
   directions: a **unit price** column is money but its sum is meaningless
   (`total: false`), and a **quantity** column is not money but its sum is the
   point (`total: true`). An **average** column never totals — an average of

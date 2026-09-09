@@ -38,6 +38,9 @@ export interface SalesReportFilter {
   tags: string[];
   /** `and` = must carry every selected tag; `or` = any one of them. */
   tagsLogic: "and" | "or";
+  /** Product names. Only the product-grained reports offer this — a
+   *  transaction-grained row has no single product to match against. */
+  products: string[];
 }
 
 export function defaultSalesReportFilter(): SalesReportFilter {
@@ -52,7 +55,8 @@ export function defaultSalesReportFilter(): SalesReportFilter {
     customers: [],
     statuses: [],
     tags: [],
-    tagsLogic: "and"
+    tagsLogic: "and",
+    products: []
   };
 }
 
@@ -64,7 +68,11 @@ export function defaultSalesReportFilter(): SalesReportFilter {
  */
 export function isReportFilterActive(f: SalesReportFilter): boolean {
   return Boolean(
-    f.customers.length || f.statuses.length || f.tags.length || f.dateBy !== "transaction_date"
+    f.customers.length ||
+    f.statuses.length ||
+    f.tags.length ||
+    f.products.length ||
+    f.dateBy !== "transaction_date"
   );
 }
 
@@ -81,6 +89,7 @@ export interface FilterableSalesReportRow {
   customerName?: string;
   status?: SalesStatus;
   tags?: string[];
+  productName?: string;
 }
 
 export function matchesSalesReportFilter(
@@ -96,6 +105,7 @@ export function matchesSalesReportFilter(
   if (f.customers.length && row.customerName && !f.customers.includes(row.customerName))
     return false;
   if (f.statuses.length && row.status && !f.statuses.includes(row.status)) return false;
+  if (f.products.length && row.productName && !f.products.includes(row.productName)) return false;
 
   if (f.tags.length && row.tags) {
     const tags = row.tags;

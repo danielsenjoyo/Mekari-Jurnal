@@ -47,7 +47,8 @@ export function useSalesReport(options?: {
       ...filter,
       customers: [...filter.customers],
       statuses: [...filter.statuses],
-      tags: [...filter.tags]
+      tags: [...filter.tags],
+      products: [...filter.products]
     };
   }
 

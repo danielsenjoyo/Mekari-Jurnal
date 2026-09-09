@@ -81,6 +81,22 @@
             />
           </MpFormControl>
 
+          <MpFormControl v-if="shows('products')">
+            <MpFormLabel>Product</MpFormLabel>
+            <MpInputTag
+              id="sales-report-filter-products"
+              :key="`products-${draftKey}`"
+              placeholder="All products"
+              :data="productData"
+              :suggestions="productOptions"
+              :max-row="-1"
+              :is-enable-create-new-tag="false"
+              :is-show-suggestions="true"
+              :is-show-icon-chevron-down="true"
+              @change="(data: TagChange[]) => (form.products = readTags(data))"
+            />
+          </MpFormControl>
+
           <MpFormControl v-if="shows('statuses')">
             <MpFormLabel>Status</MpFormLabel>
             <MpInputTag
@@ -170,6 +186,7 @@ import {
   SALES_REPORT_STATUS_OPTIONS,
   SALES_REPORT_TYPE_OPTIONS,
   salesReportCustomers,
+  salesReportProducts,
   salesReportTags
 } from "~/data/sales-report";
 import { defaultSalesReportFilter, type SalesReportFilter } from "~/data/sales-report-filter";
@@ -190,6 +207,7 @@ export type SalesReportFilterField =
   | "transactionType"
   | "dateBy"
   | "customers"
+  | "products"
   | "statuses"
   | "tags";
 
@@ -225,6 +243,7 @@ interface TagChange {
 }
 
 const customerOptions = salesReportCustomers();
+const productOptions = salesReportProducts();
 const tagOptions = salesReportTags();
 const statusSuggestions = SALES_REPORT_STATUS_OPTIONS.map((s) => s.label);
 
@@ -246,6 +265,7 @@ function chips(values: string[]) {
 }
 
 const customerData = computed(() => chips(form.customers));
+const productData = computed(() => chips(form.products));
 const tagData = computed(() => chips(form.tags));
 const statusData = computed(() => chips(form.statuses.map((s) => SALES_STATUS_LABEL[s])));
 
@@ -265,7 +285,8 @@ function loadDraft(source: SalesReportFilter) {
     ...source,
     customers: [...source.customers],
     statuses: [...source.statuses],
-    tags: [...source.tags]
+    tags: [...source.tags],
+    products: [...source.products]
   });
   draftKey.value += 1;
 }
@@ -306,7 +327,8 @@ function onApply() {
     ...form,
     customers: [...form.customers],
     statuses: [...form.statuses],
-    tags: [...form.tags]
+    tags: [...form.tags],
+    products: [...form.products]
   });
 }
 

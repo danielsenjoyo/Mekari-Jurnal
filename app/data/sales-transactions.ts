@@ -233,15 +233,30 @@ export const CUSTOMER_OPTIONS = [
   { name: "PT Sinar Terang", address: "Jl. Thamrin No. 88, Jakarta Pusat" }
 ];
 
+/**
+ * The **sell-side** price list: `price` is what this company charges, and it
+ * seeds a line's unit price on every Sales form.
+ *
+ * Its counterpart in `purchase-transactions.ts` is the **buy-side** list — the
+ * same eight products at what they cost. The two are deliberately *not* equal:
+ * these prices carry a per-product markup of roughly 20–45% over the purchase
+ * price, so the company makes a different margin on each product.
+ *
+ * That gap is the whole subject of the Product profitability report
+ * (`app/pages/reports/product_profitability.vue`), which reads both lists.
+ * The two were briefly identical, and the report was a page of zeroes — if you
+ * edit either list, keep sell above buy, and keep the margins uneven so the
+ * report has something to rank.
+ */
 export const PRODUCT_OPTIONS = [
-  { name: "Printer Paper A4 (Ream)", price: 55_000, unit: "pack" },
-  { name: "Wireless Mouse", price: 125_000, unit: "pcs" },
-  { name: "Office Chair", price: 1_450_000, unit: "pcs" },
-  { name: "Laptop Stand", price: 210_000, unit: "pcs" },
-  { name: "Whiteboard Marker Set", price: 68_000, unit: "set" },
-  { name: "Steel Filing Cabinet", price: 2_100_000, unit: "pcs" },
-  { name: "LED Desk Lamp", price: 175_000, unit: "pcs" },
-  { name: "Ethernet Cable 10m", price: 95_000, unit: "roll" }
+  { name: "Printer Paper A4 (Ream)", price: 72_000, unit: "pack" },
+  { name: "Wireless Mouse", price: 165_000, unit: "pcs" },
+  { name: "Office Chair", price: 1_850_000, unit: "pcs" },
+  { name: "Laptop Stand", price: 285_000, unit: "pcs" },
+  { name: "Whiteboard Marker Set", price: 82_000, unit: "set" },
+  { name: "Steel Filing Cabinet", price: 2_560_000, unit: "pcs" },
+  { name: "LED Desk Lamp", price: 249_000, unit: "pcs" },
+  { name: "Ethernet Cable 10m", price: 118_000, unit: "roll" }
 ];
 
 export const TERM_OPTIONS = ["Net 15", "Net 30", "Due on receipt"];

@@ -101,6 +101,12 @@ import { formatAmount, formatDisplayDate } from "~/data/purchase-transactions";
 /** Quantities and counts group thousands but carry no decimals — the same
  *  Indonesian convention as `formatAmount`, minus the money part. */
 const NUMBER_FORMAT = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
+/** Percentages always show their one decimal, so a column of them reads as a
+ *  column — `18,0` under `19,5`, not `18`. */
+const PERCENT_FORMAT = new Intl.NumberFormat("id-ID", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1
+});
 
 const props = defineProps<{
   columns: ReportColumn[];
@@ -138,6 +144,7 @@ function cellValue(row: Row, col: ReportColumn): string {
   const value = fields(row)[col.key];
   if (col.format === "money") return formatAmount(Number(value ?? 0));
   if (col.format === "number") return NUMBER_FORMAT.format(Number(value ?? 0));
+  if (col.format === "percent") return PERCENT_FORMAT.format(Number(value ?? 0));
   if (col.format === "date") return formatDisplayDate(String(value ?? ""));
   return String(value ?? "") || "—";
 }

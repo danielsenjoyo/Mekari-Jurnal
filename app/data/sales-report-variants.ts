@@ -21,6 +21,7 @@
  */
 
 import type { ReportColumn } from "./report-column";
+import { getPurchaseTransactions } from "./purchase-transactions";
 import { SALES_STATUS_LABEL, type SalesStatus } from "./sales-status";
 import {
   PRODUCT_OPTIONS,
@@ -374,6 +375,173 @@ export function buildProductReportRows(
       // "Total" here is net of returns — the figure the report exists to give.
       totalSalesValue: row.salesValue - row.returnValue
     }))
+    .sort((a, b) => a.productName.localeCompare(b.productName));
+}
+
+// ---------------------------------------------------------------------------
+// Product profitability
+// ---------------------------------------------------------------------------
+
+export interface ProfitabilityRow {
+  id: string;
+  productName: string;
+  unit: string;
+  sellQty: number;
+  grossSales: number;
+  cogs: number;
+  profit: number;
+  /** Percent, not a ratio — the column head carries the `%`. */
+  profitMargin: number;
+  avgSellPrice: number;
+  avgBuyPrice: number;
+}
+
+export const PROFITABILITY_COLUMNS: ReportColumn<keyof ProfitabilityRow & string>[] = [
+  { key: "productName", label: "Product Name", labelId: "Nama Produk", width: 220 },
+  {
+    key: "sellQty",
+    label: "Sell Qty",
+    labelId: "Qty Terjual",
+    format: "number",
+    total: true,
+    width: 110
+  },
+  { key: "unit", label: "Unit", labelId: "Satuan", width: 90 },
+  {
+    key: "grossSales",
+    label: "Total Gross Sales",
+    labelId: "Nilai Total Penjualan",
+    format: "money",
+    width: 170
+  },
+  { key: "cogs", label: "Total COGS", labelId: "Total HPP", format: "money", width: 160 },
+  {
+    key: "profit",
+    label: "Total Profit Sales",
+    labelId: "Nilai Total Profit",
+    format: "money",
+    width: 170
+  },
+  // No TOTAL: the margin of the whole report is total profit over total gross
+  // sales, which is not the sum — nor the average — of the per-product margins.
+  // The cell is left empty rather than filled with a number that isn't one.
+  {
+    key: "profitMargin",
+    label: "Profit Margin (%)",
+    labelId: "Profit Margin (%)",
+    format: "percent",
+    width: 150
+  },
+  {
+    key: "avgSellPrice",
+    label: "Avg Sell Price",
+    labelId: "Harga Jual Rata-rata",
+    format: "money",
+    total: false,
+    width: 160
+  },
+  {
+    key: "avgBuyPrice",
+    label: "Avg Buy Price",
+    labelId: "Harga Beli Rata-rata",
+    format: "money",
+    total: false,
+    width: 160
+  }
+];
+
+/**
+ * Average unit cost per product, taken from the **Purchases** ledger.
+ *
+ * This is the one report that reads both modules, because profit needs both
+ * sides of the trade. Production gets COGS per sale out of the inventory
+ * costing engine (FIFO or moving average, which is why its page carries a
+ * recalculation banner). This prototype has no costing engine, so the cost
+ * basis is the weighted average unit price across every purchase **invoice**
+ * for that product — the same figure the report's own "Avg Buy Price" column
+ * reports, so the two can never disagree.
+ *
+ * Deliberately **not** restricted to the report's date range: stock sold this
+ * quarter was generally bought before it, so a windowed cost basis would read
+ * as 100% margin on every product whose purchases fell outside the window.
+ */
+function averageBuyPrices(): Map<string, number> {
+  const qty = new Map<string, number>();
+  const value = new Map<string, number>();
+
+  getPurchaseTransactions()
+    .filter((t) => t.type === "invoice")
+    .forEach((t) =>
+      t.lines.forEach((line) => {
+        qty.set(line.product, (qty.get(line.product) ?? 0) + line.quantity);
+        value.set(line.product, (value.get(line.product) ?? 0) + line.amount);
+      })
+    );
+
+  const averages = new Map<string, number>();
+  qty.forEach((quantity, product) => {
+    averages.set(product, quantity ? Math.round((value.get(product) ?? 0) / quantity) : 0);
+  });
+  return averages;
+}
+
+/**
+ * One row per product sold, with what it earned and what it cost.
+ *
+ * Like Sales by product, the predicate is applied per *transaction* while
+ * aggregating rather than to the finished rows — a product row spans many
+ * invoices, so filtering afterwards would keep or drop a product's whole
+ * history. The product filter itself is applied by the page, since that one
+ * genuinely is a per-row test.
+ *
+ * Rows a company sold nothing of are absent rather than present at zero: this
+ * report answers "what did we make on what we sold", and a product with no
+ * sales has no answer.
+ */
+export function buildProfitabilityRows(
+  matches: (t: SalesTransaction) => boolean = () => true
+): ProfitabilityRow[] {
+  const buyPrices = averageBuyPrices();
+  const rows = new Map<string, ProfitabilityRow>();
+
+  getSalesTransactions()
+    .filter((t) => t.type === "invoice" && matches(t))
+    .forEach((t) =>
+      t.lines.forEach((line) => {
+        const row =
+          rows.get(line.product) ??
+          ({
+            id: line.product,
+            productName: line.product,
+            unit: line.unit,
+            sellQty: 0,
+            grossSales: 0,
+            cogs: 0,
+            profit: 0,
+            profitMargin: 0,
+            avgSellPrice: 0,
+            avgBuyPrice: buyPrices.get(line.product) ?? 0
+          } satisfies ProfitabilityRow);
+        row.sellQty += line.quantity;
+        row.grossSales += line.amount;
+        rows.set(line.product, row);
+      })
+    );
+
+  return [...rows.values()]
+    .map((row) => {
+      const cogs = row.sellQty * row.avgBuyPrice;
+      const profit = row.grossSales - cogs;
+      return {
+        ...row,
+        cogs,
+        profit,
+        // Margin is profit over what was sold, not over cost — a product sold
+        // at twice its cost is a 50% margin, not 100%.
+        profitMargin: row.grossSales ? Math.round((profit / row.grossSales) * 1000) / 10 : 0,
+        avgSellPrice: row.sellQty ? Math.round(row.grossSales / row.sellQty) : 0
+      };
+    })
     .sort((a, b) => a.productName.localeCompare(b.productName));
 }
 

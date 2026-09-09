@@ -253,6 +253,17 @@ export function salesReportTags(): string[] {
 }
 
 /**
+ * Products actually sold — the drawer's product picker, for the product-grained
+ * reports. Read off the transaction lines rather than `PRODUCT_OPTIONS` so the
+ * picker can only offer something the report can return a row for.
+ */
+export function salesReportProducts(): string[] {
+  return [
+    ...new Set(getSalesTransactions().flatMap((t) => t.lines.map((line) => line.product)))
+  ].sort();
+}
+
+/**
  * Where a transaction number links to, per type. Unlike Purchases — where
  * `financing` has no detail page and so renders as plain text — every Sales
  * type has one, so every number in every Sales report is a link.
