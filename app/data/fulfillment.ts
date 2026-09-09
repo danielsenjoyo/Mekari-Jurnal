@@ -317,6 +317,15 @@ function buildLines(
   });
 }
 
+// Document ids are unique across the whole dataset, not per order, because a
+// document has its own page (/fulfillment/picklist/12) and that page has to be
+// able to find it from the id in the URL alone.
+let docSeq = 0;
+function allocDocId(): number {
+  docSeq += 1;
+  return docSeq;
+}
+
 /** The documents a stage implies. An order at `delivered` must have both a
  *  picklist and a delivery slip behind it; one at `completed` has a receipt
  *  note as well. Deriving them from the stage is what keeps the detail page's
@@ -335,7 +344,7 @@ function buildDocuments(
     // Inbound raises exactly one document, and only once the goods are in.
     if (status === "completed") {
       docs.push({
-        id: 1,
+        id: allocDocId(),
         kind: "receipt",
         number: `RN/2026/09/${pad(seq)}`,
         date: shiftIso(orderDate, 5),
@@ -354,7 +363,7 @@ function buildDocuments(
 
   if (hasPicklist) {
     docs.push({
-      id: 1,
+      id: allocDocId(),
       kind: "picklist",
       number: `PL/2026/09/${pad(seq)}`,
       date: shiftIso(orderDate, 2),
@@ -366,7 +375,7 @@ function buildDocuments(
   }
   if (hasDelivery) {
     docs.push({
-      id: 2,
+      id: allocDocId(),
       kind: "delivery",
       number: `DS/2026/09/${pad(seq)}`,
       date: shiftIso(orderDate, 3),
@@ -379,8 +388,8 @@ function buildDocuments(
     });
   }
   if (hasReceipt) {
-    docs.push({
-      id: 3,
+    const receipt: FulfillmentDoc = {
+      id: allocDocId(),
       kind: "receipt",
       number: `RN/2026/09/${pad(seq)}`,
       date: shiftIso(orderDate, 6),
@@ -388,9 +397,10 @@ function buildDocuments(
       trackingNo: "",
       completedByDocId: null,
       lines: lines.map((l) => ({ lineId: l.id, quantity: l.quantityOnCompleted }))
-    });
+    };
+    docs.push(receipt);
     const delivery = docs.find((d) => d.kind === "delivery");
-    if (delivery) delivery.completedByDocId = 3;
+    if (delivery) delivery.completedByDocId = receipt.id;
   }
   return docs;
 }
@@ -673,8 +683,23 @@ export function canCancel(order: FulfillmentOrder): boolean {
   return order.status === "new_order" || order.status === "on_process";
 }
 
-function nextDocId(order: FulfillmentOrder): number {
-  return order.documents.reduce((max, d) => Math.max(max, d.id), 0) + 1;
+/** Guards a document page against an id from the wrong route —
+ *  `/fulfillment/picklist/13` must not render a delivery slip. Returns the
+ *  document with the order it belongs to, since the page needs both. */
+export function getFulfillmentDocument(
+  id: number,
+  kind: FulfillmentDocKind
+): { doc: FulfillmentDoc; order: FulfillmentOrder } | undefined {
+  for (const order of getFulfillmentOrders()) {
+    const doc = order.documents.find((d) => d.id === id && d.kind === kind);
+    if (doc) return { doc, order };
+  }
+  return undefined;
+}
+
+/** Where a document's own page lives. */
+export function documentRoute(doc: Pick<FulfillmentDoc, "id" | "kind">): string {
+  return `/fulfillment/${doc.kind}/${doc.id}`;
 }
 
 function touch(order: FulfillmentOrder, date: string): void {
@@ -729,7 +754,7 @@ export function createPicklist(id: number, input: PicklistInput): FulfillmentDoc
     line.quantityOnPicked = line.quantityOnProcess;
   });
   const doc: FulfillmentDoc = {
-    id: nextDocId(order),
+    id: allocDocId(),
     kind: "picklist",
     number: input.number,
     date: input.date,
@@ -758,7 +783,7 @@ export function createDeliveryNote(id: number, input: DeliveryInput): Fulfillmen
     line.quantityOnDelivery = line.quantityOnPicked;
   });
   const doc: FulfillmentDoc = {
-    id: nextDocId(order),
+    id: allocDocId(),
     kind: "delivery",
     number: input.number,
     date: input.date,
@@ -804,7 +829,7 @@ export function createReceiptNote(id: number, input: ReceiptInput): FulfillmentD
   });
 
   const doc: FulfillmentDoc = {
-    id: nextDocId(order),
+    id: allocDocId(),
     kind: "receipt",
     number: input.number,
     date: input.date,
@@ -838,6 +863,77 @@ export function cancelFulfillment(
   order.cancelDate = date;
   order.cancelReason = reason;
   order.completedPartiallyAndCanceled = totals.completed > 0;
+  touch(order, date);
+  return order;
+}
+
+/**
+ * Whether a document can still be called off.
+ *
+ * Only the last step taken. Cancelling a picklist once a delivery slip has been
+ * raised against it would leave the slip shipping goods nothing picked — so a
+ * document is cancellable exactly while the order still sits at the stage that
+ * document put it in. The source app expresses the same rule per page and per
+ * field (`data?.delivery_date === null` on the picklist page,
+ * `data?.receive_date === null` on the delivery page); one predicate over the
+ * status says it once.
+ */
+export function canCancelDocument(order: FulfillmentOrder, doc: FulfillmentDoc): boolean {
+  const stageItPutTheOrderIn: Record<FulfillmentDocKind, FulfillmentStatus> = {
+    picklist: "picked",
+    delivery: "delivered",
+    receipt: "completed"
+  };
+  return order.status === stageItPutTheOrderIn[doc.kind];
+}
+
+/** The stage an order falls back to when `doc` is cancelled. */
+function stageBefore(order: FulfillmentOrder, kind: FulfillmentDocKind): FulfillmentStatus {
+  if (kind === "picklist") return "on_process";
+  if (kind === "delivery") return "picked";
+  // An inbound receipt IS the whole lifecycle, so undoing it goes all the way
+  // back to a new order rather than to a delivery stage that never existed.
+  return order.direction === "inbound" ? "new_order" : "delivered";
+}
+
+/**
+ * Removes a document and rolls the order back to the stage before it, clearing
+ * the quantities that document had moved.
+ */
+export function cancelDocument(docId: number, date: string): FulfillmentOrder | undefined {
+  const found = getFulfillmentOrders()
+    .map((order) => ({ order, doc: order.documents.find((d) => d.id === docId) }))
+    .find((x) => x.doc);
+  if (!found?.doc) return undefined;
+  const { order, doc } = found;
+  if (!canCancelDocument(order, doc)) return undefined;
+
+  order.documents = order.documents.filter((d) => d.id !== docId);
+  order.lines.forEach((line) => {
+    if (doc.kind === "picklist") line.quantityOnPicked = 0;
+    if (doc.kind === "delivery") line.quantityOnDelivery = 0;
+    if (doc.kind === "receipt") line.quantityOnCompleted = 0;
+  });
+  if (doc.kind === "delivery") {
+    order.courier = "";
+    order.trackingNo = "";
+    order.deliveryDate = null;
+  }
+  if (doc.kind === "receipt") {
+    order.receiveDate = null;
+    order.completedPartially = false;
+    // The delivery slip this receipt closed is open again.
+    const delivery = order.documents.find((d) => d.completedByDocId === docId);
+    if (delivery) delivery.completedByDocId = null;
+    if (order.direction === "inbound") {
+      order.lines.forEach((line) => {
+        line.quantityOnProcess = 0;
+        line.quantityOnPicked = 0;
+        line.quantityOnDelivery = 0;
+      });
+    }
+  }
+  order.status = stageBefore(order, doc.kind);
   touch(order, date);
   return order;
 }

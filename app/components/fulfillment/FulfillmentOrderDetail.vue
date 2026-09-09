@@ -230,9 +230,10 @@
             <colgroup>
               <col style="width: 26%" />
               <col style="width: 20%" />
-              <col v-if="activeTab.kind === 'delivery'" style="width: 20%" />
+              <col v-if="activeTab.kind === 'delivery'" style="width: 16%" />
+              <col v-if="activeTab.kind === 'delivery'" style="width: 14%" />
+              <col style="width: 14%" />
               <col v-if="activeTab.kind === 'delivery'" style="width: 18%" />
-              <col style="width: 16%" />
             </colgroup>
             <MpTableHead :class="tableHeadClass">
               <MpTableRow>
@@ -241,11 +242,20 @@
                 <MpTableCell v-if="activeTab.kind === 'delivery'" as="th">Courier</MpTableCell>
                 <MpTableCell v-if="activeTab.kind === 'delivery'" as="th">Tracking no.</MpTableCell>
                 <MpTableCell as="th">Status</MpTableCell>
+                <MpTableCell v-if="activeTab.kind === 'delivery'" as="th" />
               </MpTableRow>
             </MpTableHead>
             <MpTableBody>
               <MpTableRow v-for="doc in activeTab.documents" :key="doc.id">
-                <MpTableCell as="td" :class="wrapCellClass">{{ doc.number }}</MpTableCell>
+                <MpTableCell as="td" :class="wrapCellClass">
+                  <MpTextlink
+                    as="button"
+                    variant="primary"
+                    :class="textlinkCellClass"
+                    @click="navigateTo(documentRoute(doc))"
+                    >{{ doc.number }}</MpTextlink
+                  >
+                </MpTableCell>
                 <MpTableCell as="td">{{ formatDisplayDate(doc.date) }}</MpTableCell>
                 <MpTableCell v-if="activeTab.kind === 'delivery'" as="td" :class="wrapCellClass">{{
                   doc.courier || "—"
@@ -257,6 +267,21 @@
                   <MpBadge for="tableStatus" :type="docStatus(doc).type">
                     {{ docStatus(doc).label }}
                   </MpBadge>
+                </MpTableCell>
+                <!-- The receipt note that closed this slip. Without it an
+                     outbound receipt note has a page nothing links to: the
+                     order's tabs are Picklists and Delivery slips, and the
+                     receipt's own back-reference points the other way. The
+                     source app carries the same "See receipt note" link. -->
+                <MpTableCell v-if="activeTab.kind === 'delivery'" as="td">
+                  <MpTextlink
+                    v-if="receiptFor(doc)"
+                    as="button"
+                    variant="secondary"
+                    :class="textlinkCellClass"
+                    @click="navigateTo(documentRoute(receiptFor(doc)!))"
+                    >See receipt note</MpTextlink
+                  >
                 </MpTableCell>
               </MpTableRow>
             </MpTableBody>
@@ -424,6 +449,7 @@ import {
   createDeliveryNote,
   createPicklist,
   createReceiptNote,
+  documentRoute,
   formatDisplayDate,
   FULFILLMENT_ACTION_LABEL,
   getAdjacentFulfillmentIds,
@@ -588,6 +614,12 @@ const activeTab = computed(() => tabs.value[activeTabIndex.value] ?? tabs.value[
 /** A document's own state. A delivery slip is in transit until a receipt note
  *  closes it (`completedByDocId`); everything else is done the moment it is
  *  raised. */
+/** The receipt note that closed a delivery slip, when one has. */
+function receiptFor(doc: FulfillmentDoc): FulfillmentDoc | undefined {
+  if (!doc.completedByDocId) return undefined;
+  return order.value?.documents.find((d) => d.id === doc.completedByDocId);
+}
+
 function docStatus(doc: FulfillmentDoc): {
   label: string;
   type: "completed" | "information";
