@@ -160,11 +160,28 @@
         </MpTable>
       </MpTableContainer>
 
+      <!-- Attachments. Inert, like the Purchase Request page's
+           (docs/patterns/details-page-format.md): this prototype models no
+           upload or storage, so the rows name the paperwork the source shows
+           and nothing downloads. A picklist has none — it is an internal
+           worksheet, not a document anything is filed against. -->
+      <div v-if="record.doc.attachments.length" :class="attachmentsClass">
+        <MpText weight="semiBold" color="dark" :class="attachmentsTitleClass">
+          Attachments ({{ record.doc.attachments.length }})
+        </MpText>
+        <MpFlex direction="column" gap="2">
+          <MpFlex v-for="file in record.doc.attachments" :key="file" align-items="center" gap="2">
+            <MpIcon name="doc" size="sm" color="gray.400" />
+            <MpText size="body-small" :class="wrapTextClass">{{ file }}</MpText>
+          </MpFlex>
+        </MpFlex>
+      </div>
+
       <MpTextlink
         as="button"
         variant="secondary"
         :class="[lastUpdatedClass, textlinkAlignClass]"
-        @click="onAction('view-audit-log')"
+        @click="isAuditModalOpen = true"
       >
         Last updated by {{ record.order.updatedBy }} on
         {{ formatDisplayDate(record.order.updatedAt) }} 09:00:00 AM GMT +7
@@ -191,6 +208,13 @@
         :editable-quantities="nextStep === 'receive'"
         @close="isNextStepDrawerOpen = false"
         @submit="onNextStep"
+      />
+
+      <FulfillmentAuditModal
+        :is-open="isAuditModalOpen"
+        :subject="record.doc.number"
+        :logs="record.order.logs"
+        @close="isAuditModalOpen = false"
       />
 
       <MpModal :is-open="isCancelModalOpen" size="sm" @close="isCancelModalOpen = false">
@@ -230,6 +254,7 @@ import {
   MpButton,
   MpDivider,
   MpFlex,
+  MpIcon,
   MpModal,
   MpModalBody,
   MpModalCloseButton,
@@ -248,6 +273,7 @@ import {
 } from "@mekari/pixel3";
 import BlankSlate from "~/components/template/BlankSlate.vue";
 import DefaultPageContent from "~/components/template/DefaultPageContent.vue";
+import FulfillmentAuditModal from "~/components/fulfillment/FulfillmentAuditModal.vue";
 import FulfillmentDocumentDrawer from "~/components/fulfillment/FulfillmentDocumentDrawer.vue";
 import { textlinkAlignClass, textlinkCellClass } from "~/utils/textlink-align";
 import { FULFILLMENT_STATUS_LABEL } from "~/data/fulfillment-status";
@@ -406,6 +432,7 @@ const nextStepKind = computed<FulfillmentDocKind | null>(() => {
   }
 });
 
+const isAuditModalOpen = ref(false);
 const isCancelModalOpen = ref(false);
 const isNextStepDrawerOpen = ref(false);
 
@@ -437,7 +464,7 @@ function onCancelDocument() {
 }
 
 function onAction(what: string) {
-  void what; // print and the audit log open nothing in this prototype
+  void what; // Print opens nothing in this prototype — there is no PDF endpoint
 }
 
 // All css() below uses Pixel 3 token shortcuts only (token mode 2.1).
@@ -465,6 +492,9 @@ const numTotalClass = css({ textAlign: "right", fontWeight: "semiBold" });
 const totalLabelClass = css({ textAlign: "right", fontWeight: "semiBold" });
 // On a <td>: wrapping only — a table cell must stay `display: table-cell`.
 const wrapCellClass = css({ whiteSpace: "normal!", wordBreak: "break-word", textAlign: "left" });
+
+const attachmentsClass = css({ mt: 6 });
+const attachmentsTitleClass = css({ display: "block", mb: 2 });
 
 const lastUpdatedClass = css({ display: "block", mt: 6, fontSize: "sm" });
 

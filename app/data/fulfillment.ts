@@ -121,6 +121,24 @@ export interface FulfillmentDoc {
   completedByDocId: number | null;
   /** Per-line quantities this document covers. */
   lines: { lineId: number; quantity: number }[];
+  /** File names only — this prototype never uploads or stores the bytes, the
+   *  same way `attachments` works on a Sales/Purchase transaction. Delivery
+   *  slips and receipt notes carry paperwork (a signed slip, a photo of the
+   *  goods); a picklist is an internal worksheet and carries none. */
+  attachments: string[];
+}
+
+/** One entry in an order's audit trail. The source app fetches these from an
+ *  endpoint per record; here they are written by the lifecycle helpers as the
+ *  order moves, which is the same information with no second source of truth. */
+export interface FulfillmentLogEntry {
+  /** `YYYY-MM-DD`. */
+  date: string;
+  /** What happened, e.g. "Order processed". */
+  action: string;
+  user: string;
+  /** The specifics — which document, which quantities. */
+  detail: string;
 }
 
 export interface FulfillmentOrder {
@@ -154,6 +172,8 @@ export interface FulfillmentOrder {
   completedPartiallyAndCanceled: boolean;
   lines: FulfillmentLine[];
   documents: FulfillmentDoc[];
+  /** Newest first — the audit modal reads it in that order. */
+  logs: FulfillmentLogEntry[];
   updatedBy: string;
   /** `YYYY-MM-DD`. The source shows a full timestamp; the prototype has no
    *  clock behind it, so the detail page renders this date with a fixed time
@@ -351,7 +371,8 @@ function buildDocuments(
         courier: "",
         trackingNo: "",
         completedByDocId: null,
-        lines: lines.map((l) => ({ lineId: l.id, quantity: l.quantityOnCompleted }))
+        lines: lines.map((l) => ({ lineId: l.id, quantity: l.quantityOnCompleted })),
+        attachments: [`goods-receipt-${pad(seq)}.pdf`]
       });
     }
     return docs;
@@ -370,7 +391,9 @@ function buildDocuments(
       courier: "",
       trackingNo: "",
       completedByDocId: null,
-      lines: lines.map((l) => ({ lineId: l.id, quantity: l.quantityOnPicked }))
+      lines: lines.map((l) => ({ lineId: l.id, quantity: l.quantityOnPicked })),
+      // A picklist is an internal worksheet — nothing is filed against it.
+      attachments: []
     });
   }
   if (hasDelivery) {
@@ -384,7 +407,8 @@ function buildDocuments(
       // Filled in below once the receipt exists — the forward reference has to
       // point at something already built.
       completedByDocId: null,
-      lines: lines.map((l) => ({ lineId: l.id, quantity: l.quantityOnDelivery }))
+      lines: lines.map((l) => ({ lineId: l.id, quantity: l.quantityOnDelivery })),
+      attachments: [`delivery-slip-${pad(seq)}.pdf`, `packing-photo-${pad(seq)}.jpg`]
     });
   }
   if (hasReceipt) {
@@ -396,13 +420,69 @@ function buildDocuments(
       courier: "",
       trackingNo: "",
       completedByDocId: null,
-      lines: lines.map((l) => ({ lineId: l.id, quantity: l.quantityOnCompleted }))
+      lines: lines.map((l) => ({ lineId: l.id, quantity: l.quantityOnCompleted })),
+      attachments: [`signed-receipt-${pad(seq)}.pdf`]
     };
     docs.push(receipt);
     const delivery = docs.find((d) => d.kind === "delivery");
     if (delivery) delivery.completedByDocId = receipt.id;
   }
   return docs;
+}
+
+/**
+ * The audit trail a seeded order would have accumulated on its way to the
+ * stage it is in — newest first, matching how the modal reads it.
+ *
+ * The source app fetches these from a per-record endpoint. Deriving them from
+ * the documents that exist keeps the trail and the record from disagreeing:
+ * there is no way to have a "Delivery slip created" entry with no slip.
+ */
+function buildLogs(
+  order: Pick<FulfillmentOrder, "status" | "direction" | "orderDate" | "lines" | "documents">,
+  user: string,
+  cancelDate: string | null,
+  cancelReason: string
+): FulfillmentLogEntry[] {
+  const entries: FulfillmentLogEntry[] = [
+    {
+      date: order.orderDate,
+      action: "Fulfillment created",
+      user,
+      detail: `${order.lines.length} product${order.lines.length === 1 ? "" : "s"} sent to fulfillment`
+    }
+  ];
+
+  const processed = order.lines.reduce((a, l) => a + l.quantityOnProcess, 0);
+  if (processed > 0) {
+    entries.push({
+      date: shiftIso(order.orderDate, 1),
+      action: "Order processed",
+      user,
+      detail: `${processed} unit${processed === 1 ? "" : "s"} reserved for picking`
+    });
+  }
+
+  order.documents.forEach((doc) => {
+    const total = doc.lines.reduce((a, l) => a + l.quantity, 0);
+    entries.push({
+      date: doc.date,
+      action: `${FULFILLMENT_DOC_LABEL[doc.kind]} created`,
+      user,
+      detail: `${doc.number} — ${total} unit${total === 1 ? "" : "s"}`
+    });
+  });
+
+  if (cancelDate) {
+    entries.push({
+      date: cancelDate,
+      action: "Fulfillment canceled",
+      user,
+      detail: cancelReason || "No reason given"
+    });
+  }
+
+  return entries.reverse();
 }
 
 function buildOrder(
@@ -440,6 +520,7 @@ function buildOrder(
 
   const delivery = documents.find((d) => d.kind === "delivery");
   const receipt = documents.find((d) => d.kind === "receipt");
+  const staff = WAREHOUSE_STAFF[seq % WAREHOUSE_STAFF.length]!;
 
   return {
     id: seq,
@@ -467,7 +548,13 @@ function buildOrder(
     completedPartiallyAndCanceled,
     lines,
     documents,
-    updatedBy: WAREHOUSE_STAFF[seq % WAREHOUSE_STAFF.length]!,
+    logs: buildLogs(
+      { status, direction, orderDate, lines, documents },
+      staff,
+      status === "canceled" ? shiftIso(orderDate, partial ? 8 : 4) : null,
+      status === "canceled" ? CANCEL_REASONS[index % CANCEL_REASONS.length]! : ""
+    ),
+    updatedBy: staff,
     updatedAt: receipt?.date ?? delivery?.date ?? shiftIso(orderDate, 1)
   };
 }
@@ -702,8 +789,29 @@ export function documentRoute(doc: Pick<FulfillmentDoc, "id" | "kind">): string 
   return `/fulfillment/${doc.kind}/${doc.id}`;
 }
 
-function touch(order: FulfillmentOrder, date: string): void {
+/** The person every mutation in this prototype is attributed to. A real app
+ *  would read the signed-in user; the dummy auth here has no identity to read,
+ *  and the Sales detail pages hardcode the same name for the same reason. */
+const CURRENT_USER = "Rizal Candra";
+
+/** Stamps the record as changed and writes the audit entry for it. Every
+ *  mutation goes through here, so the trail cannot fall behind the record. */
+function touch(order: FulfillmentOrder, date: string, action: string, detail: string): void {
   order.updatedAt = date;
+  order.updatedBy = CURRENT_USER;
+  order.logs.unshift({ date, action, user: CURRENT_USER, detail });
+}
+
+/** `touch` for the three document creators, which all write the same entry
+ *  shape — the document's label, its number and how much it carries. */
+function logDocument(order: FulfillmentOrder, doc: FulfillmentDoc, date: string): void {
+  const total = doc.lines.reduce((a, l) => a + l.quantity, 0);
+  touch(
+    order,
+    date,
+    `${FULFILLMENT_DOC_LABEL[doc.kind]} created`,
+    `${doc.number} — ${total} unit${total === 1 ? "" : "s"}`
+  );
 }
 
 /**
@@ -725,7 +833,13 @@ export function processOrder(
     line.quantityOnProcess = Math.min(line.quantity, line.quantityOnProcess + add);
   });
   if (orderTotals(order).processed > 0) order.status = "on_process";
-  touch(order, date);
+  const processed = orderTotals(order).processed;
+  touch(
+    order,
+    date,
+    "Order processed",
+    `${processed} unit${processed === 1 ? "" : "s"} reserved for picking`
+  );
   return order;
 }
 
@@ -738,7 +852,7 @@ export function cancelProcessing(id: number, date: string): FulfillmentOrder | u
     line.quantityOnProcess = 0;
   });
   order.status = "new_order";
-  touch(order, date);
+  touch(order, date, "Processing undone", "Processed quantities cleared");
   return order;
 }
 
@@ -761,11 +875,12 @@ export function createPicklist(id: number, input: PicklistInput): FulfillmentDoc
     courier: "",
     trackingNo: "",
     completedByDocId: null,
-    lines: order.lines.map((l) => ({ lineId: l.id, quantity: l.quantityOnPicked }))
+    lines: order.lines.map((l) => ({ lineId: l.id, quantity: l.quantityOnPicked })),
+    attachments: []
   };
   order.documents.push(doc);
   order.status = "picked";
-  touch(order, input.date);
+  logDocument(order, doc, input.date);
   return doc;
 }
 
@@ -790,14 +905,15 @@ export function createDeliveryNote(id: number, input: DeliveryInput): Fulfillmen
     courier: input.courier,
     trackingNo: input.trackingNo,
     completedByDocId: null,
-    lines: order.lines.map((l) => ({ lineId: l.id, quantity: l.quantityOnDelivery }))
+    lines: order.lines.map((l) => ({ lineId: l.id, quantity: l.quantityOnDelivery })),
+    attachments: []
   };
   order.documents.push(doc);
   order.status = "delivered";
   order.courier = input.courier;
   order.trackingNo = input.trackingNo;
   order.deliveryDate = input.date;
-  touch(order, input.date);
+  logDocument(order, doc, input.date);
   return doc;
 }
 
@@ -836,7 +952,8 @@ export function createReceiptNote(id: number, input: ReceiptInput): FulfillmentD
     courier: "",
     trackingNo: "",
     completedByDocId: null,
-    lines: order.lines.map((l) => ({ lineId: l.id, quantity: l.quantityOnCompleted }))
+    lines: order.lines.map((l) => ({ lineId: l.id, quantity: l.quantityOnCompleted })),
+    attachments: []
   };
   order.documents.push(doc);
 
@@ -847,7 +964,7 @@ export function createReceiptNote(id: number, input: ReceiptInput): FulfillmentD
   order.receiveDate = input.date;
   const totals = orderTotals(order);
   order.completedPartially = totals.completed < totals.ordered;
-  touch(order, input.date);
+  logDocument(order, doc, input.date);
   return doc;
 }
 
@@ -863,7 +980,7 @@ export function cancelFulfillment(
   order.cancelDate = date;
   order.cancelReason = reason;
   order.completedPartiallyAndCanceled = totals.completed > 0;
-  touch(order, date);
+  touch(order, date, "Fulfillment canceled", reason || "No reason given");
   return order;
 }
 
@@ -934,7 +1051,7 @@ export function cancelDocument(docId: number, date: string): FulfillmentOrder | 
     }
   }
   order.status = stageBefore(order, doc.kind);
-  touch(order, date);
+  touch(order, date, `${FULFILLMENT_DOC_LABEL[doc.kind]} canceled`, `${doc.number} removed`);
   return order;
 }
 

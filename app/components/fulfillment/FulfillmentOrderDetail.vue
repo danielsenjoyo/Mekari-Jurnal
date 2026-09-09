@@ -300,7 +300,7 @@
         as="button"
         variant="secondary"
         :class="[lastUpdatedClass, textlinkAlignClass]"
-        @click="onAction('view-audit-log')"
+        @click="isAuditModalOpen = true"
       >
         Last updated by {{ order.updatedBy }} on {{ formatDisplayDate(order.updatedAt) }} 09:00:00
         AM GMT +7
@@ -359,6 +359,13 @@
         @submit="onDocument"
       />
 
+      <FulfillmentAuditModal
+        :is-open="isAuditModalOpen"
+        :subject="order.orderNumber"
+        :logs="order.logs"
+        @close="isAuditModalOpen = false"
+      />
+
       <!-- Cancelling is destructive and irreversible, so it confirms — see
            docs/patterns/Modal.md. -->
       <MpModal :is-open="isCancelModalOpen" size="sm" @close="isCancelModalOpen = false">
@@ -391,10 +398,46 @@
             <MpModalCloseButton />
           </MpModalHeader>
           <MpModalBody>
-            <MpText size="body" color="gray.700">
-              The processed quantities are cleared and this order goes back to New order. You can
-              process it again afterwards.
+            <MpText size="body" color="gray.700" :class="modalIntroClass">
+              These quantities are cleared and this order goes back to New order. You can process it
+              again afterwards.
             </MpText>
+            <!-- The source's cancel-on-process modal lists exactly what is
+                 being released rather than only asking to confirm — on a
+                 multi-line order "the processed quantities" is not something
+                 the user can picture. -->
+            <MpTableContainer :class="modalTableScrollClass">
+              <MpTable :class="tableFixedClass">
+                <colgroup>
+                  <col style="width: 58%" />
+                  <col style="width: 22%" />
+                  <col style="width: 20%" />
+                </colgroup>
+                <MpTableHead :class="tableHeadClass">
+                  <MpTableRow>
+                    <MpTableCell as="th">Product</MpTableCell>
+                    <MpTableCell as="th" :class="numCellClass">Processed</MpTableCell>
+                    <MpTableCell as="th">Unit</MpTableCell>
+                  </MpTableRow>
+                </MpTableHead>
+                <MpTableBody>
+                  <MpTableRow v-for="line in processedLines" :key="line.id">
+                    <MpTableCell as="td" :class="wrapCellClass">{{ line.product }}</MpTableCell>
+                    <MpTableCell as="td" :class="numCellClass">{{
+                      line.quantityOnProcess
+                    }}</MpTableCell>
+                    <MpTableCell as="td" :class="wrapCellClass">{{ line.unit }}</MpTableCell>
+                  </MpTableRow>
+                  <MpTableRow>
+                    <MpTableCell as="td" :class="totalLabelClass">Total units</MpTableCell>
+                    <MpTableCell as="td" :class="numTotalClass">{{
+                      orderTotals(order).processed
+                    }}</MpTableCell>
+                    <MpTableCell as="td" />
+                  </MpTableRow>
+                </MpTableBody>
+              </MpTable>
+            </MpTableContainer>
           </MpModalBody>
           <MpModalFooter>
             <div :class="modalFooterClass">
@@ -438,6 +481,7 @@ import {
 } from "@mekari/pixel3";
 import BlankSlate from "~/components/template/BlankSlate.vue";
 import DefaultPageContent from "~/components/template/DefaultPageContent.vue";
+import FulfillmentAuditModal from "~/components/fulfillment/FulfillmentAuditModal.vue";
 import FulfillmentDocumentDrawer from "~/components/fulfillment/FulfillmentDocumentDrawer.vue";
 import FulfillmentProcessDrawer from "~/components/fulfillment/FulfillmentProcessDrawer.vue";
 import { textlinkAlignClass, textlinkCellClass } from "~/utils/textlink-align";
@@ -630,7 +674,14 @@ function docStatus(doc: FulfillmentDoc): {
     : { label: "In transit", type: "information" };
 }
 
+/** The lines the undo-processing modal lists — only those actually holding a
+ *  processed quantity, since a line at 0 has nothing to release. */
+const processedLines = computed(() =>
+  (order.value?.lines ?? []).filter((l) => l.quantityOnProcess > 0)
+);
+
 const openDrawer = ref<"process" | "document" | null>(null);
+const isAuditModalOpen = ref(false);
 const isCancelModalOpen = ref(false);
 const isUndoProcessModalOpen = ref(false);
 
@@ -705,10 +756,6 @@ function onUndoProcessing() {
   revision.value += 1;
 }
 
-function onAction(what: string) {
-  void what; // wire to the audit-log modal on a real screen
-}
-
 // All css() below uses Pixel 3 token shortcuts only (token mode 2.1).
 const topRowClass = css({
   display: "grid",
@@ -744,6 +791,8 @@ const tabPanelClass = css({ mt: 4 });
 const lastUpdatedClass = css({ display: "block", mt: 6, fontSize: "sm" });
 
 const modalTitleClass = css({ fontSize: "lg" });
+const modalIntroClass = css({ display: "block", mb: 4 });
+const modalTableScrollClass = css({ maxHeight: "320px", overflowY: "auto" });
 const modalFooterClass = css({ display: "flex", justifyContent: "flex-end", gap: 2 });
 
 const bottomActionsClass = css({

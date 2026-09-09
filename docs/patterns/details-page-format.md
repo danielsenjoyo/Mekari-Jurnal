@@ -100,8 +100,16 @@ that and the child route silently renders the parent's own template instead
 - **Unsaved-changes guarding:** not applicable — edit is a separate route
   (see the Rules section above), not in-place state on this page.
 - **"Last updated by …" reads as a link**, not plain text (`MpTextlink`, not
-  `MpText`) — confirmed from two separate screenshots (Invoice, Order). Not
-  wired to anything real here (would open an audit-log modal).
+  `MpText`) — confirmed from two separate screenshots (Invoice, Order). It was
+  wired to nothing on the Purchase and Sales pages; **Fulfillment now opens a
+  real audit-log modal** behind it
+  ([`FulfillmentAuditModal.vue`](../../app/components/fulfillment/FulfillmentAuditModal.vue)):
+  a Date / Action / User / Details table, newest first, with a "Time is shown
+  in GMT +7." footnote. The entries are written by the module's own lifecycle
+  helpers as the record moves, so the trail cannot disagree with the record —
+  which is the part worth copying if the money types grow one. The source app
+  binds its Details cell with `v-html` against a server-rendered diff string;
+  don't. It is an XSS surface and nothing here needs markup.
 
 ## Resolved — Order (the second reference impl)
 
