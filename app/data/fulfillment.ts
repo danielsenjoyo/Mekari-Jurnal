@@ -587,9 +587,20 @@ export function getFulfillmentBoard(
 }
 
 /** Every warehouse that actually appears on this board — the filter's options
- *  come from the data rather than from a constant that could drift out of it. */
+ *  come from the data rather than from a constant that could drift out of it.
+ *
+ *  Blanks are dropped: not every source order names a warehouse, and an empty
+ *  string would render as a nameless `<option value="">` sitting directly under
+ *  "All warehouses" — which selects the same thing and looks like a rendering
+ *  fault. */
 export function warehouseOptions(direction: FulfillmentDirection): string[] {
-  return [...new Set(getFulfillmentOrdersByDirection(direction).map((o) => o.warehouse))].sort();
+  return [
+    ...new Set(
+      getFulfillmentOrdersByDirection(direction)
+        .map((o) => o.warehouse)
+        .filter(Boolean)
+    )
+  ].sort();
 }
 
 // ---------------------------------------------------------------------------
