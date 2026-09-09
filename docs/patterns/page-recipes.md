@@ -18,6 +18,21 @@ only differ in what fills the stage.
 `Tabs` (content, opt) → `FilterBar` + `Drawer` → `TablePage` (+ `BulkActionBar`,
 `StatusBadge`) **or** `BlankSlate` → `Pagination`.
 
+## Recipe: Board page
+
+> One collection, shown as the stages of a process. Full recipe:
+> [`KanbanBoard`](./KanbanBoard.md).
+
+`page-title-bar` → **stage:** `FilterBar` (quick filters + Reload + search) →
+a row of status columns, each a header with a [`StatusBadge`](./StatusBadge.md)
+count over a stack of link cards **or** one [`BlankSlate`](./BlankSlate.md) when
+every column is empty.
+
+**The one thing to get right:** don't reach for it. A board buys one glance at
+the pipeline and pays for it with sorting, bulk actions and pagination — worth
+it only when the status column is the user's actual question (Fulfillment), not
+whenever records happen to have a status.
+
 ## Recipe: Details / single-record page
 
 > View or edit one record. Full recipe: [`details-page-format`](./details-page-format.md).
@@ -131,6 +146,7 @@ wrapping element.
 | [`BlankSlate`](./BlankSlate.md)                   | Empty state: empty table, empty section, record not found. |
 | [`Form`](./Form.md)                               | `MpFormControl`-wrapped fields.                            |
 | [`Modal`](./Modal.md)                             | Centred confirm / focused dialog.                          |
+| [`KanbanBoard`](./KanbanBoard.md)                 | A collection as stages of one process.                     |
 | [`index-page-format`](./index-page-format.md)     | Index-page zone composition.                               |
 | [`details-page-format`](./details-page-format.md) | Details-page zone composition.                             |
 | [`form-page-format`](./form-page-format.md)       | Create/edit form-page zone composition.                    |

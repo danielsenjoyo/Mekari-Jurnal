@@ -15,6 +15,7 @@ and the `@mekari/pixel3` component library.
 | Look up a raw token value                       | [`tokens.md`](./tokens.md)                                                                                              |
 | Pick patterns for a kind of page                | [`patterns/page-recipes.md`](./patterns/page-recipes.md)                                                                |
 | Build a list/index screen                       | [`patterns/index-page-format.md`](./patterns/index-page-format.md) + [`index-page-pattern.md`](./index-page-pattern.md) |
+| Build a board (records as stages of a process)  | [`patterns/KanbanBoard.md`](./patterns/KanbanBoard.md)                                                                  |
 | Build a single-record screen                    | [`patterns/details-page-format.md`](./patterns/details-page-format.md)                                                  |
 | Build a create/edit form screen                 | [`patterns/form-page-format.md`](./patterns/form-page-format.md) + [`patterns/Form.md`](./patterns/Form.md)             |
 | Work on the Home landing page                   | [`patterns/home-page-format.md`](./patterns/home-page-format.md)                                                        |
@@ -39,6 +40,7 @@ implementation [`app/pages/templates/index-template.vue`](../app/pages/templates
 
 - [`page-recipes.md`](./patterns/page-recipes.md) — which patterns assemble which page type.
 - [`index-page-format.md`](./patterns/index-page-format.md) — index/list page zone composition.
+- [`KanbanBoard.md`](./patterns/KanbanBoard.md) — the board: a collection shown as stages of one process. When it beats a table, and the column/width/empty-state rules that make it readable (Fulfillment).
 - [`details-page-format.md`](./patterns/details-page-format.md) — single-record page composition.
 - [`form-page-format.md`](./patterns/form-page-format.md) — create/edit form page composition (+ the Purchase module page map).
 - [`home-page-format.md`](./patterns/home-page-format.md) — the Home landing page: section stack, the no-PageTitle exception, what the port from production leaves out.
