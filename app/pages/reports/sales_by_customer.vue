@@ -1,5 +1,5 @@
 <template>
-  <DefaultPageContent title="Purchase by vendor" breadcrumb="Reports" breadcrumb-to="/reports">
+  <DefaultPageContent title="Sales by customer" breadcrumb="Reports" breadcrumb-to="/reports">
     <template #actions>
       <ReportExportButton :is-disabled="!hasRun" :row-count="filteredRows.length" />
     </template>
@@ -8,29 +8,29 @@
       v-model:start-date="filter.startDate"
       v-model:end-date="filter.endDate"
       v-model:period-id="filter.periodId"
-      :periods="PURCHASE_REPORT_PERIODS"
+      :periods="SALES_REPORT_PERIODS"
       :is-valid="isRangeValid"
       :is-filter-active="isDrawerFilterActive"
       @run="runReport"
       @open-drawer="isFilterDrawerOpen = true"
     >
-      <!-- Production's own "Sort by" — the report is read vendor-first, so the
-           choice is between the vendors' names and what they cost. -->
+      <!-- Production's own "Sort by" — the report is read customer-first, so
+           the choice is between the customers' names and what they bought. -->
       <div :class="sortFieldClass">
         <MpFormControl>
           <MpFormLabel>Sort by</MpFormLabel>
           <MpSelect v-model="sortBy" is-full-width>
-            <option value="vendor_name">Vendor</option>
-            <option value="total_purchases">Total purchases</option>
+            <option value="customer_name">Customer</option>
+            <option value="total_sales">Total sales</option>
           </MpSelect>
         </MpFormControl>
       </div>
     </ReportFilterBar>
 
-    <PurchaseReportFilterDrawer
+    <SalesReportFilterDrawer
       :is-open="isFilterDrawerOpen"
       :applied="filter"
-      :fields="['transactionType', 'vendors', 'tags']"
+      :fields="['transactionType', 'customers', 'tags']"
       @close="isFilterDrawerOpen = false"
       @apply="onApplyFilter"
     />
@@ -41,14 +41,14 @@
 
     <template v-if="hasRun && filteredRows.length">
       <ReportTable
-        :columns="VENDOR_REPORT_COLUMNS"
+        :columns="CUSTOMER_REPORT_COLUMNS"
         :rows="pagedRows"
         :total-rows="filteredRows"
         :is-loading="isLoading"
       >
         <template #cell="{ row, col, value }">
           <MpTextlink
-            v-if="col.key === 'number' && routeFor(row.type as TransactionType)"
+            v-if="col.key === 'number'"
             as="button"
             variant="primary"
             :class="textlinkAlignClass"
@@ -85,27 +85,27 @@
 import { computed, ref } from "vue";
 import { css, MpFormControl, MpFormLabel, MpSelect, MpText, MpTextlink } from "@mekari/pixel3";
 import DefaultPageContent from "~/components/template/DefaultPageContent.vue";
-import PurchaseReportFilterDrawer from "~/components/reports/PurchaseReportFilterDrawer.vue";
+import SalesReportFilterDrawer from "~/components/reports/SalesReportFilterDrawer.vue";
 import ReportBlankSlate from "~/components/reports/ReportBlankSlate.vue";
 import ReportExportButton from "~/components/reports/ReportExportButton.vue";
 import ReportFilterBar from "~/components/reports/ReportFilterBar.vue";
 import ReportPagination from "~/components/reports/ReportPagination.vue";
 import ReportTable from "~/components/reports/ReportTable.vue";
-import { usePurchaseReport } from "~/composables/usePurchaseReport";
+import { useSalesReport } from "~/composables/useSalesReport";
 import { useReportPaging } from "~/composables/useReportPaging";
 import {
-  VENDOR_REPORT_COLUMNS,
-  buildVendorLineRows,
-  type VendorLineRow
-} from "~/data/purchase-report-variants";
-import { matchesPurchaseReportFilter } from "~/data/purchase-report-filter";
-import { TRANSACTION_TYPE_LABEL, type TransactionType } from "~/data/purchase-transactions";
-import { PURCHASE_REPORT_PERIODS, PURCHASE_TRANSACTION_ROUTE } from "~/data/purchase-report";
+  CUSTOMER_REPORT_COLUMNS,
+  buildCustomerLineRows,
+  type CustomerLineRow
+} from "~/data/sales-report-variants";
+import { matchesSalesReportFilter } from "~/data/sales-report-filter";
+import { SALES_REPORT_PERIODS, SALES_TRANSACTION_ROUTE } from "~/data/sales-report";
+import { TRANSACTION_TYPE_LABEL, type TransactionType } from "~/data/sales-transactions";
 import { textlinkAlignClass } from "~/utils/textlink-align";
 
-useHead({ title: "Purchase by vendor — Mekari Jurnal" });
+useHead({ title: "Sales by customer — Mekari Jurnal" });
 
-const sortBy = ref<"vendor_name" | "total_purchases">("vendor_name");
+const sortBy = ref<"customer_name" | "total_sales">("customer_name");
 
 const {
   filter,
@@ -119,25 +119,27 @@ const {
   onApplyFilter,
   clearFilters,
   metaLine
-} = usePurchaseReport({ onRun: () => reset() });
+} = useSalesReport({ onRun: () => reset() });
 
-const filteredRows = computed<VendorLineRow[]>(() => {
+const filteredRows = computed<CustomerLineRow[]>(() => {
   const f = applied.value;
   if (!f) return [];
-  const rows = buildVendorLineRows(f.transactionType).filter((row) =>
-    matchesPurchaseReportFilter(row, f)
+  const rows = buildCustomerLineRows(f.transactionType).filter((row) =>
+    matchesSalesReportFilter(row, f)
   );
-  if (sortBy.value === "vendor_name") return rows;
+  if (sortBy.value === "customer_name") return rows;
 
-  // "Total purchases" orders the vendors by what they cost, biggest first,
-  // while keeping each vendor's own lines together — the rows are line items,
-  // so sorting them individually by amount would scatter every vendor.
+  // "Total sales" orders the customers by what they bought, biggest first,
+  // while keeping each customer's own lines together — the rows are line items,
+  // so sorting them individually by amount would scatter every customer.
   const totals = new Map<string, number>();
-  rows.forEach((row) => totals.set(row.vendorName, (totals.get(row.vendorName) ?? 0) + row.amount));
+  rows.forEach((row) =>
+    totals.set(row.customerName, (totals.get(row.customerName) ?? 0) + row.amount)
+  );
   return [...rows].sort(
     (a, b) =>
-      (totals.get(b.vendorName) ?? 0) - (totals.get(a.vendorName) ?? 0) ||
-      a.vendorName.localeCompare(b.vendorName) ||
+      (totals.get(b.customerName) ?? 0) - (totals.get(a.customerName) ?? 0) ||
+      a.customerName.localeCompare(b.customerName) ||
       a.date.localeCompare(b.date)
   );
 });
@@ -155,7 +157,7 @@ const {
 } = useReportPaging(filteredRows);
 
 function routeFor(type: TransactionType) {
-  return PURCHASE_TRANSACTION_ROUTE[type];
+  return SALES_TRANSACTION_ROUTE[type];
 }
 
 const meta = computed(() =>

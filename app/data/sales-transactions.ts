@@ -83,6 +83,10 @@ export interface SalesTransactionTax {
 export interface SalesTransactionPayment {
   id: number;
   date: string;
+  /** `YYYY-MM-DD` alongside the display `date`, so a report can ask what had
+   *  been paid *as of* some day (Customer balance, Aged receivable) rather
+   *  than only what is owed right now. */
+  dateSort: string;
   number: string;
   method: string;
   amount: number;
@@ -91,6 +95,8 @@ export interface SalesTransactionPayment {
 export interface SalesCreditMemo {
   id: number;
   date: string;
+  /** `YYYY-MM-DD`, for the same reason as `SalesTransactionPayment.dateSort`. */
+  dateSort: string;
   number: string;
   amount: number;
 }
@@ -233,15 +239,30 @@ export const CUSTOMER_OPTIONS = [
   { name: "PT Sinar Terang", address: "Jl. Thamrin No. 88, Jakarta Pusat" }
 ];
 
+/**
+ * The **sell-side** price list: `price` is what this company charges, and it
+ * seeds a line's unit price on every Sales form.
+ *
+ * Its counterpart in `purchase-transactions.ts` is the **buy-side** list — the
+ * same eight products at what they cost. The two are deliberately *not* equal:
+ * these prices carry a per-product markup of roughly 20–45% over the purchase
+ * price, so the company makes a different margin on each product.
+ *
+ * That gap is the whole subject of the Product profitability report
+ * (`app/pages/reports/product_profitability.vue`), which reads both lists.
+ * The two were briefly identical, and the report was a page of zeroes — if you
+ * edit either list, keep sell above buy, and keep the margins uneven so the
+ * report has something to rank.
+ */
 export const PRODUCT_OPTIONS = [
-  { name: "Printer Paper A4 (Ream)", price: 55_000, unit: "pack" },
-  { name: "Wireless Mouse", price: 125_000, unit: "pcs" },
-  { name: "Office Chair", price: 1_450_000, unit: "pcs" },
-  { name: "Laptop Stand", price: 210_000, unit: "pcs" },
-  { name: "Whiteboard Marker Set", price: 68_000, unit: "set" },
-  { name: "Steel Filing Cabinet", price: 2_100_000, unit: "pcs" },
-  { name: "LED Desk Lamp", price: 175_000, unit: "pcs" },
-  { name: "Ethernet Cable 10m", price: 95_000, unit: "roll" }
+  { name: "Printer Paper A4 (Ream)", price: 72_000, unit: "pack" },
+  { name: "Wireless Mouse", price: 165_000, unit: "pcs" },
+  { name: "Office Chair", price: 1_850_000, unit: "pcs" },
+  { name: "Laptop Stand", price: 285_000, unit: "pcs" },
+  { name: "Whiteboard Marker Set", price: 82_000, unit: "set" },
+  { name: "Steel Filing Cabinet", price: 2_560_000, unit: "pcs" },
+  { name: "LED Desk Lamp", price: 249_000, unit: "pcs" },
+  { name: "Ethernet Cable 10m", price: 118_000, unit: "roll" }
 ];
 
 export const TERM_OPTIONS = ["Net 15", "Net 30", "Due on receipt"];
@@ -397,26 +418,29 @@ function buildTransaction(type: TransactionType, i: number, seq: number): SalesT
       : pool[i % pool.length]!;
 
   const lines = buildLines(seq);
+  // NOTE: this is the **net** line value, and `computeTransactionTotals` — the
+  // form's model of the same record — returns `subtotal: gross` instead. The
+  // two disagree, and have since both were written. See
+  // `docs/patterns/reports-page-format.md` § The subtotal disagreement before
+  // changing either: populating `discountPerLines` here without also switching
+  // this to gross makes the detail pages' totals column stop adding up.
   const subtotal = lines.reduce((sum, l) => sum + l.amount, 0);
   const taxAmount = Math.round(subtotal * TAX_RATE);
   const total = subtotal + taxAmount;
 
   let amountReceived = 0;
   const payments: SalesTransactionPayment[] = [];
-  if (status === "paid") {
-    amountReceived = total;
+  // Paid a few days after the invoice was raised. The date matters: the
+  // as-of-date reports (Customer balance, Aged receivable) rewind the balance
+  // by dropping payments made after the day being asked about, so a payment
+  // with no position in time would make those two reports meaningless.
+  const paidOn = dateAt(-i * 3 + 5);
+  if (status === "paid" || status === "partial") {
+    amountReceived = status === "paid" ? total : Math.round(total * 0.4);
     payments.push({
       id: 1,
-      date: formatDate(dateAt(-i * 3 + 5)),
-      number: `RCV/2026/09/${pad(seq)}`,
-      method: PAYMENT_METHODS[i % PAYMENT_METHODS.length]!,
-      amount: total
-    });
-  } else if (status === "partial") {
-    amountReceived = Math.round(total * 0.4);
-    payments.push({
-      id: 1,
-      date: formatDate(dateAt(-i * 3 + 5)),
+      date: formatDate(paidOn),
+      dateSort: toLocalIsoDate(paidOn),
       number: `RCV/2026/09/${pad(seq)}`,
       method: PAYMENT_METHODS[i % PAYMENT_METHODS.length]!,
       amount: amountReceived
@@ -465,7 +489,9 @@ function buildTransaction(type: TransactionType, i: number, seq: number): SalesT
     priceIncludesTax: false,
     subtotal,
     // Generated records have no transaction-level discount or withholding —
-    // those only arrive from the create/edit form.
+    // those only arrive from the create/edit form. `discountPerLines` stays 0
+    // for now even though `buildLines()` does hand out line discounts: see the
+    // note on `subtotal` above.
     discountPerLines: 0,
     discountType: "percent" as DiscountType,
     discountValue: 0,
@@ -632,8 +658,22 @@ function linkJoinInvoicesToInvoices(all: SalesTransaction[]): void {
       joinInvoice.taxAmount = 0;
       joinInvoice.taxes = [];
       joinInvoice.balanceDue = linked.reduce((sum, inv) => sum + inv.balanceDue, 0);
-      joinInvoice.amountReceived = 0;
+      joinInvoice.amountReceived = joinInvoice.total - joinInvoice.balanceDue;
       joinInvoice.payments = [];
+      // The figures above are the linked invoices' — so the status has to be
+      // too. It was left on whatever the generator's pool handed out, which
+      // produced "Paid" join invoices still showing their full balance due the
+      // moment a report put the two columns side by side. A record that is
+      // rejected or awaiting approval keeps that status: those describe where
+      // the document is in the approval flow, not what is owed on it.
+      if (joinInvoice.status !== "rejected" && !joinInvoice.needsApproval) {
+        joinInvoice.status =
+          joinInvoice.balanceDue === 0
+            ? "paid"
+            : joinInvoice.amountReceived > 0
+              ? "partial"
+              : "open";
+      }
     });
 }
 
@@ -821,6 +861,7 @@ export function applyCreditMemo(
   record.creditMemos.push({
     id: record.creditMemos.length + 1,
     date: todayDisplayDate(),
+    dateSort: todayIsoDate(),
     number,
     amount: applied
   });

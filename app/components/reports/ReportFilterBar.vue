@@ -1,43 +1,62 @@
 <template>
   <div :class="filterBarClass">
-    <div :class="dateFieldClass">
+    <!-- A balance report asks about one day, not a span — "what was owed on
+         30/09". A start date would have no meaning: the balance carries
+         forward from the beginning of time. -->
+    <div v-if="mode === 'as-of'" :class="dateFieldClass">
       <MpFormControl>
-        <MpFormLabel>Start date</MpFormLabel>
+        <MpFormLabel>As of date</MpFormLabel>
         <MpDatePicker
-          :model-value="startDate"
+          :model-value="asOfDate"
           value-type="string"
           :format="DATE_INPUT_FORMAT"
           placeholder="DD/MM/YYYY"
           use-portal
-          @update:model-value="onDate('startDate', $event)"
+          @update:model-value="$emit('update:asOfDate', $event)"
         />
       </MpFormControl>
     </div>
 
-    <div :class="dateFieldClass">
-      <MpFormControl>
-        <MpFormLabel>End date</MpFormLabel>
-        <MpDatePicker
-          :model-value="endDate"
-          value-type="string"
-          :format="DATE_INPUT_FORMAT"
-          placeholder="DD/MM/YYYY"
-          use-portal
-          @update:model-value="onDate('endDate', $event)"
-        />
-      </MpFormControl>
-    </div>
+    <template v-else>
+      <div :class="dateFieldClass">
+        <MpFormControl>
+          <MpFormLabel>Start date</MpFormLabel>
+          <MpDatePicker
+            :model-value="startDate"
+            value-type="string"
+            :format="DATE_INPUT_FORMAT"
+            placeholder="DD/MM/YYYY"
+            use-portal
+            @update:model-value="onDate('startDate', $event)"
+          />
+        </MpFormControl>
+      </div>
 
-    <div :class="periodFieldClass">
-      <MpFormControl>
-        <MpFormLabel>Period</MpFormLabel>
-        <MpSelect :model-value="periodId" is-full-width @update:model-value="onPeriod">
-          <option v-for="period in PURCHASE_REPORT_PERIODS" :key="period.id" :value="period.id">
-            {{ period.label }}
-          </option>
-        </MpSelect>
-      </MpFormControl>
-    </div>
+      <div :class="dateFieldClass">
+        <MpFormControl>
+          <MpFormLabel>End date</MpFormLabel>
+          <MpDatePicker
+            :model-value="endDate"
+            value-type="string"
+            :format="DATE_INPUT_FORMAT"
+            placeholder="DD/MM/YYYY"
+            use-portal
+            @update:model-value="onDate('endDate', $event)"
+          />
+        </MpFormControl>
+      </div>
+
+      <div :class="periodFieldClass">
+        <MpFormControl>
+          <MpFormLabel>Period</MpFormLabel>
+          <MpSelect :model-value="periodId" is-full-width @update:model-value="onPeriod">
+            <option v-for="period in periods" :key="period.id" :value="period.id">
+              {{ period.label }}
+            </option>
+          </MpSelect>
+        </MpFormControl>
+      </div>
+    </template>
 
     <!-- Anything a single report adds to the bar (a group-by, a sort-by) goes
          here, so it lands between the period and the buttons rather than
@@ -59,7 +78,7 @@
 
 <script setup lang="ts">
 import { css, MpButton, MpDatePicker, MpFormControl, MpFormLabel, MpSelect } from "@mekari/pixel3";
-import { PURCHASE_REPORT_PERIODS } from "~/data/purchase-report";
+import type { ReportPeriod } from "~/data/report-period";
 import { isoToDmy, DATE_INPUT_FORMAT } from "~/utils/dates";
 
 /**
@@ -74,10 +93,26 @@ import { isoToDmy, DATE_INPUT_FORMAT } from "~/utils/dates";
  * mutating a filter object, so each page keeps ownership of its own filter
  * shape (which differs per report) while sharing this chrome.
  */
-defineProps<{
+const props = defineProps<{
+  /**
+   * `range` (the default) is the usual report: a start date, an end date and a
+   * period preset. `as-of` is the balance report — one date, no period, because
+   * "what was owed on 30/09" has no start: the balance carries forward from the
+   * beginning of the ledger. Customer balance and Aged receivable use it.
+   */
+  mode?: "range" | "as-of";
+  /** `as-of` mode only. */
+  asOfDate?: string;
   startDate: string;
   endDate: string;
   periodId: string;
+  /**
+   * The presets this report offers. Passed in rather than imported: each module
+   * resolves its presets against its **own** fixture "today"
+   * (`~/data/report-period`), and shared chrome must not reach into one
+   * module's dataset to serve another's page.
+   */
+  periods: ReportPeriod[];
   /** Both ends of the range parse — production disables Filter on the same test. */
   isValid: boolean;
   /** Anything set in the drawer — drives the dot. */
@@ -88,6 +123,7 @@ const emit = defineEmits<{
   "update:startDate": [value: string];
   "update:endDate": [value: string];
   "update:periodId": [value: string];
+  "update:asOfDate": [value: string];
   run: [];
   "open-drawer": [];
 }>();
@@ -102,7 +138,7 @@ function onDate(field: "startDate" | "endDate", value: string) {
 /** Picking a preset fills both dates; "Custom" leaves whatever is there. */
 function onPeriod(id: string) {
   emit("update:periodId", id);
-  const bounds = PURCHASE_REPORT_PERIODS.find((p) => p.id === id)?.range?.();
+  const bounds = props.periods.find((p) => p.id === id)?.range?.();
   if (!bounds) return;
   emit("update:startDate", isoToDmy(bounds.start));
   emit("update:endDate", isoToDmy(bounds.end));

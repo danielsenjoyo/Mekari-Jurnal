@@ -3,24 +3,32 @@
 > A **report** screen: pick a date range and criteria, press a button, read a
 > table with a TOTAL row. Looks like an index page and isn't one.
 > Reference impl: [`app/pages/reports/purchases_list.vue`](../../app/pages/reports/purchases_list.vue)
-> — the other four Purchases reports are the same five components with
-> different columns.
+> — the other fifteen reports (four Purchases, eleven Sales) are the same five
+> components with different columns.
 > Shared chrome: [`ReportFilterBar`](../../app/components/reports/ReportFilterBar.vue),
 > [`ReportTable`](../../app/components/reports/ReportTable.vue),
 > [`ReportPagination`](../../app/components/reports/ReportPagination.vue),
 > [`ReportBlankSlate`](../../app/components/reports/ReportBlankSlate.vue),
-> [`ReportExportButton`](../../app/components/reports/ReportExportButton.vue),
-> [`PurchaseReportFilterDrawer`](../../app/components/reports/PurchaseReportFilterDrawer.vue);
-> state: [`usePurchaseReport`](../../app/composables/usePurchaseReport.ts),
-> [`useReportPaging`](../../app/composables/useReportPaging.ts);
-> data: [`purchase-report.ts`](../../app/data/purchase-report.ts),
+> [`ReportExportButton`](../../app/components/reports/ReportExportButton.vue);
+> shared data: [`report-column.ts`](../../app/data/report-column.ts),
+> [`report-period.ts`](../../app/data/report-period.ts);
+> shared state: [`useReportPaging`](../../app/composables/useReportPaging.ts).
+> Per module — Purchases:
+> [`PurchaseReportFilterDrawer`](../../app/components/reports/PurchaseReportFilterDrawer.vue),
+> [`usePurchaseReport`](../../app/composables/usePurchaseReport.ts),
+> [`purchase-report.ts`](../../app/data/purchase-report.ts),
 > [`purchase-report-variants.ts`](../../app/data/purchase-report-variants.ts),
-> [`purchase-report-filter.ts`](../../app/data/purchase-report-filter.ts),
-> [`report-column.ts`](../../app/data/report-column.ts).
+> [`purchase-report-filter.ts`](../../app/data/purchase-report-filter.ts);
+> Sales: [`SalesReportFilterDrawer`](../../app/components/reports/SalesReportFilterDrawer.vue),
+> [`useSalesReport`](../../app/composables/useSalesReport.ts),
+> [`sales-report.ts`](../../app/data/sales-report.ts),
+> [`sales-report-variants.ts`](../../app/data/sales-report-variants.ts),
+> [`sales-report-filter.ts`](../../app/data/sales-report-filter.ts).
 > See also [`index-page-format`](./index-page-format.md), [`TablePage`](./TablePage.md),
 > [`Drawer`](./Drawer.md), [`reports-index-format`](./reports-index-format.md).
 
-Ported from `jurnal-frontend-app` → `src/pages/reports/purchases_*`.
+Ported from `jurnal-frontend-app` → `src/pages/reports/purchases_*` and
+`src/pages/reports/sales_*`.
 
 ## Building one
 
@@ -28,17 +36,19 @@ A report page is columns, a row projection, and wiring. Everything else is
 shared:
 
 ```vue
-<ReportFilterBar v-model:start-date … :is-valid :is-filter-active @run @open-drawer>
+<ReportFilterBar v-model:start-date … :periods :is-valid :is-filter-active @run @open-drawer>
   <!-- optional: this report's own Sort by / Group by -->
 </ReportFilterBar>
 <PurchaseReportFilterDrawer :fields="[…]" … />
+<!-- or SalesReportFilterDrawer -->
 <ReportTable :columns :rows="pagedRows" :total-rows="filteredRows" :is-loading />
 <ReportPagination v-model:page v-model:per-page … />
 <ReportBlankSlate v-else :has-run :is-filter-active @clear />
 ```
 
-`usePurchaseReport()` owns the two filter objects and the run; `useReportPaging(filteredRows)`
-owns the footer. The page owns only `filteredRows`.
+`usePurchaseReport()` / `useSalesReport()` owns the two filter objects and the
+run; `useReportPaging(filteredRows)` owns the footer. The page owns only
+`filteredRows`.
 
 **`ReportTable` is generic** (`generic="Row extends object"`), so the `#cell`
 slot hands the page its _own_ row type rather than a `Record`. Override only the
@@ -54,6 +64,251 @@ through to the default.
 | Purchase delivery         | one delivery, or one delivered line | **Group by** switches columns _and_ row grain   |
 | Purchase by product       | one **product**, aggregated         | Filter applies per transaction, not per row     |
 | Purchase order completion | one order                           | Links order → its delivery                      |
+
+## The eleven Sales reports
+
+The first five are the AR mirror of the table above, one for one — same five
+shapes, same five components, `vendorName` → `customerName`. The last six have
+no AP counterpart:
+
+| Report                 | Rows are                             | Notable                                                        |
+| ---------------------- | ------------------------------------ | -------------------------------------------------------------- |
+| Sales list             | one transaction                      | 3 column layouts (Template ▾), sortable headers, **Deposit**   |
+| Sales by customer      | one **line item**, customer-ordered  | Sort by customer / total sales                                 |
+| Sales delivery         | one delivery, or one delivered line  | **Group by** switches columns _and_ row grain                  |
+| Sales by product       | one **product**, aggregated          | Filter applies per transaction, not per row                    |
+| Sales order completion | one order                            | Links order → its delivery                                     |
+| Product profitability  | one **product** sold, aggregated     | **Reads both ledgers** — sales for revenue, purchases for cost |
+| Pro forma invoice list | one pro forma invoice                | The Sales list pinned to one type, minus Deposit               |
+| Join invoice list      | one join invoice                     | Nine columns, not sixteen — see below                          |
+| Customer balance       | one unpaid invoice, customer-ordered | **As of one date**, not a range                                |
+| Aged receivable        | one customer                         | **As of one date**; columns are age bands, not fields          |
+| Sales tax              | one invoice × tax label              | Invoices only; lives on the **Tax** tab, not Sales             |
+
+### Five of them were built, not ported
+
+Pro forma invoice list, Join invoice list, Customer balance, Aged receivable
+and Sales tax have **no Vue page in `jurnal-frontend-app`** to port — production
+still renders all five server-side. They are built to this document instead, from what their
+cards on the Reports index promise.
+
+For the two invoice lists that promise is the Sales list pinned to one
+transaction type ("Shows all created proforma invoices in a certain period"), so
+that is what they are: same composable, same drawer,
+`defaults: { transactionType }` and a column set of their own. Customer balance
+and Aged receivable are a different shape entirely — see § As of a date, not
+over a range.
+
+**Sales tax** is a listing, not a summary. Its card promises "taxable amount,
+tax rate, and tax amount … used in transactions", so the rows are one per
+**invoice × tax label** — not one per rate. The grain is per label because a
+single invoice can mix them: `TAX_OPTIONS` offers PPN 11%, PPN 12% and
+Non-taxable, and the form sets one per line. Every generated record is on PPN
+11%, so today it renders one row per invoice; a form-built record with two rates
+produces two rows, each with its own DPP, which is what earns the Tax Name and
+Tax Rate columns their place.
+
+It reports **invoices only**. Quotations and orders in this dataset carry a tax
+figure, but neither creates a liability — a tax report that added them up would
+overstate what is owed, which is a worse failure than a missing filter. Rejected
+invoices are out for the same reason. Where the record summarises a label in its
+own `taxes` array that figure wins, so the report can never disagree with the
+invoice it came from.
+
+**Their column sets are trimmed to what the document actually carries**, which
+is the whole reason they aren't literally `sales_list`. A join invoice has no
+lines of its own — the generator sets its figures from the invoices it bundles
+— so `taxAmount`, `amountReceived` and both discount fields stay at zero and
+`subtotal` equals `total`. Offering the Sales list's sixteen columns would mean
+six guaranteed `0,00`s and one duplicate of Total. It ships nine, including
+**Invoices Bundled**, which is the only column that says anything the Sales
+list couldn't.
+
+When you pin a report to a type, walk `TYPE_CAPABILITIES` and the generator for
+that type before choosing columns. The rule from § Gotchas scales: a column that
+can never say anything is worse than no column, and a page of them is worse
+still.
+
+Two things are genuinely Sales', not a find-and-replace:
+
+- **Deposit** (Detailed layout). A customer can pay a share of an invoice up
+  front; every third invoice in the fixture carries one, so the column has
+  something to say. Its AP counterpart doesn't exist.
+- **Every transaction number is a link.** All eight Sales types have a detail
+  page, so `SALES_TRANSACTION_ROUTE` is a total `Record` — where the Purchases
+  map is `Partial`, because `financing` has no page and those numbers have to
+  render as plain text.
+
+And one omission worth naming: production's Sales order completion has a
+**Start from: Order / Quote** selector that swaps the leading columns. A
+quotation in this dataset carries no link to the order it became, so quote-first
+would render a table whose Order, Invoice and Payment columns were empty on
+every row — the same rule that dropped Payment from the Purchases version.
+
+## As of a date, not over a range
+
+Customer balance and Aged receivable ask a different question from every other
+report here: not "what happened between two dates" but **"what was owed on
+one"**. A balance has no start — it carries forward from the beginning of the
+ledger — so a start date and a period preset would both be lies.
+
+`ReportFilterBar` takes `mode="as-of"`: one **As of date** field, no period
+select. `useSalesReport({ mode: "as-of" })` matches it, validating the single
+date and writing `As of 02/09/2026` into the meta strip instead of a range.
+`ReportBlankSlate` takes the same `mode` — its production copy names the two
+controls it expects you to touch ("Select dates or period"), and pointing at a
+period select that isn't on screen is worse than no instruction.
+
+**Pass `mode` to all three or none.** They describe the same screen; a bar in
+one mode under a blank slate in the other contradicts itself.
+
+### Rewinding the balance
+
+The stored `balanceDue` is only ever _today's_ answer. `balanceAsOf()` reverses
+it by adding back everything settled after the day in question, which is what
+`payment.dateSort` and `creditMemo.dateSort` were added for — an invoice paid
+on 20 Sep was fully outstanding on 15 Sep, and a report that showed it settled
+would be reporting the present while claiming to report the past. An invoice
+not yet raised on that date contributes nothing: it cannot be owed before it
+exists.
+
+**A settled invoice is absent, not present at zero.** The report answers "who
+owes us what", and a paid invoice is not an answer — which is also what makes
+the TOTAL row the receivable balance itself.
+
+### The two must reconcile
+
+Aged receivable is the same `balanceAsOf` grouped by customer instead of listed
+by invoice, and every invoice lands in exactly one bucket. So on any given date
+**Aged receivable's Total equals Customer balance's Balance Due total** — a row
+is a partition of a customer's balance, not five overlapping measures. Verified
+at 02/09/2026: both report 67.197.757,00.
+
+Changing the as-of date must redistribute that figure without changing it. At
+02/09 the fixture's invoices are all under 30 days late, so only Current and
+1–30 carry anything; at 31/12 every one of them has aged into > 90 Days — and
+the total is 67.197.757,00 both times. **If a date change moves the total, the
+bucketing is double-counting.**
+
+The three empty buckets at today's date are the one place this report bends the
+"no column that can never say anything" rule, and deliberately: they are empty
+_at this date_, not structurally, and the whole point of the as-of control is
+that moving it fills them.
+
+## The one report that reads both ledgers
+
+Product profitability needs revenue _and_ cost, so it is the only report that
+crosses modules: sales invoices give gross sales, and the Purchases ledger
+gives the cost basis. Three decisions in
+[`buildProfitabilityRows`](../../app/data/sales-report-variants.ts) are worth
+knowing.
+
+**COGS is the weighted average purchase price, not a costing engine.**
+Production computes cost per sale from FIFO or moving-average inventory
+valuation — which is why its page carries a recalculation banner. Here the cost
+basis is the average unit price actually paid across every purchase invoice for
+that product, which is also exactly what the report's own Avg Buy Price column
+shows, so the two can never disagree. It lands below list price because
+purchase lines carry discounts.
+
+**The cost basis ignores the report's date range.** Stock sold this quarter was
+generally bought before it, so a windowed cost basis would report 100% margin
+on every product whose purchases fell outside the window.
+
+**Margin is profit over revenue, not over cost** — something sold at twice its
+cost is a 50% margin, not 100% — and the TOTAL row leaves that cell empty. The
+report's overall margin is total profit over total gross sales, which is neither
+the sum nor the average of the per-product margins; that's what
+`format: "percent"` defaulting to `total: false` is for.
+
+### The fixture has to have a margin in it
+
+The two modules keep separate `PRODUCT_OPTIONS`: `sales-transactions.ts` is the
+**sell-side** list, `purchase-transactions.ts` the **buy-side** one. They were
+briefly identical — the company bought and sold everything at the same price —
+and this report was a page of `0,00` and `0%`. The sales list now carries a
+per-product markup of roughly 20–45%.
+
+**If you edit either list, keep sell above buy, and keep the markups uneven.**
+Equal prices make the report meaningless; one flat markup makes every row rank
+the same, which is worse than it sounds for a report whose job is to say what to
+sell more of.
+
+### A report is a consistency check on its own fixture
+
+Putting a module's records in a table with a TOTAL row surfaces things no
+detail page does. Two defects in the Sales fixture were found this way, both
+pre-dating the reports:
+
+- **A join invoice's status was independent of its balance**, because the
+  linking pass overwrites the figures but left the generator's status alone —
+  so the Join invoice list showed `Paid` rows carrying their full balance due.
+  Status is now derived from the linked balance, except for `rejected` and
+  awaiting-approval records, whose status describes where the document sits in
+  the approval flow rather than what is owed on it.
+
+It was invisible until two columns sat next to each other. **When a new
+report's numbers look wrong, suspect the fixture before the projection.**
+
+### The subtotal disagreement — known, unfixed
+
+**`Discount Amount` reads `0,00` on every row of every list report, in both
+modules.** It is not a broken column; it is an honest reading of a fixture that
+contradicts itself, and the fix is bigger than it looks.
+
+`buildLines()` gives roughly one line in six a 10% discount, and `line.amount`
+is net of it. But the generator then stores `subtotal` as the **net** line
+value with `discountPerLines: 0`, while `computeTransactionTotals` — the form's
+model of the very same record — returns `subtotal: gross` with
+`discountPerLines = gross − net`. The two have always disagreed about what
+`subtotal` means. `discountPerLines: 0` is what hides it.
+
+Populating `discountPerLines` alone is **not** the fix, and was tried: the
+detail pages render their discount row under `v-if="discountPerLines > 0"`, so
+filling it in makes a deduction row appear beneath a Subtotal that is already
+net of that deduction — and `total` doesn't subtract it either. The totals
+column stops adding up on six Sales detail pages.
+
+**`depositAmount` is the same disagreement in a second place.** The generator
+computes `balanceDue = total − amountReceived` and leaves the deposit out of it;
+the form's `computeTransactionTotals` returns
+`balanceDue = total − withholding − deposit`. So an invoice detail page can show
+"Deposit received Rp2.454.432" directly above a Balance due of the full total —
+the customer paid, and still appears to owe everything. Both predate the reports
+(`bde8b1a`); the Sales list's Deposit column just puts the two figures on one
+screen for the first time.
+
+The actual fix is to make the generator agree with the form: store
+`subtotal: gross`, deduct the deposit in `balanceDue`, keep tax and `total`
+computed from net (so no figure moves),
+and update the report projection to `grossAmount: t.subtotal` instead of
+`subtotal + discounts`. That means the return-recompute passes, the join-invoice
+and pro-forma-order linking passes, and the same set again in
+`purchase-transactions.ts` — Purchases carries the identical latent defect. It
+is a fixture money-model change deserving its own pass and its own verification
+across every detail page in both modules, not a rider on a reports branch.
+
+## What is shared and what is mirrored
+
+Two modules now build reports, so the line matters:
+
+| Shared, one copy                                            | Mirrored per module                                    |
+| ----------------------------------------------------------- | ------------------------------------------------------ |
+| The five `Report*` chrome components                        | The **filter drawer** — its criteria differ            |
+| `report-column.ts` (`ReportColumn`, `ReportLayout`, totals) | `*-report.ts` — columns, layouts, route map            |
+| `report-period.ts` — the 11 presets                         | `*-report-variants.ts` — the other four reports        |
+| `useReportPaging`                                           | `*-report-filter.ts` + `use*Report` — the run contract |
+
+The rule is the one [`sales-status.ts`](../../app/data/sales-status.ts) already
+states: **anything a module could plausibly want to change on its own is
+mirrored, not shared.** A column Sales adds must not reshape the Purchases
+table.
+
+**Periods are the reason `ReportFilterBar` takes a `periods` prop.** Each
+module resolves the presets against its _own_ fixture "today"
+(`buildReportPeriods(todayIsoDate)`), so the chrome is handed a list rather than
+importing one — shared chrome reaching into one module's dataset to serve
+another module's page is exactly the coupling this split exists to prevent.
 
 ## How it differs from an index page
 
@@ -129,10 +384,14 @@ vanish when the drawer closes. A dot that's always lit says nothing.
 carries a fixed px `width`, a `format`, and two derived behaviours worth
 knowing:
 
-- **`format`** — `money`, `number`, `date`, or text. `money` uses the Purchases
-  module's `formatAmount`; never hand-roll a formatter in a report.
-- **`align`** defaults to right for `money` and `number`.
-- **`total`** defaults to true for `money` only. Override it in both
+- **`format`** — `money`, `number`, `percent`, `date`, or text. `money` uses the
+  Purchases module's `formatAmount`; never hand-roll a formatter in a report.
+  `percent` is a figure already out of 100, written to exactly one decimal so a
+  column of them lines up (`18,0` under `19,5`, never `18`) — put the `%` in the
+  column head, not the cell.
+- **`align`** defaults to right for `money`, `number` and `percent`.
+- **`total`** defaults to true for `money` only — a `percent` column therefore
+  opts out by default. Override it in both
   directions: a **unit price** column is money but its sum is meaningless
   (`total: false`), and a **quantity** column is not money but its sum is the
   point (`total: true`). An **average** column never totals — an average of
@@ -170,8 +429,10 @@ empty table needs a visible way out.
 ## Rows come from the module, not a new fixture
 
 `buildPurchaseReportRows()` projects
-[`purchase-transactions.ts`](../../app/data/purchase-transactions.ts) — the same
-array the Purchases list, detail and form pages read and write. A report over a
+[`purchase-transactions.ts`](../../app/data/purchase-transactions.ts), and
+`buildSalesReportRows()` projects
+[`sales-transactions.ts`](../../app/data/sales-transactions.ts) — the same
+arrays each module's list, detail and form pages read and write. A report over a
 parallel fixture drifts from the module it reports on, and its money and date
 formats drift with it (see [`page-recipes`](./page-recipes.md) § "one format per
 value type, per module"). Derived figures like `grossAmount` are computed in the
@@ -195,10 +456,13 @@ buildProductReportRows(type, (t) => matchesPurchaseReportFilter({ date: t.transa
 `matchesPurchaseReportFilter` reads a **structural** `FilterableReportRow`, not
 one report's row type, precisely so all five can share it. A field a report
 doesn't carry is absent, and its clause is skipped.
+`matchesSalesReportFilter` / `FilterableSalesReportRow` is the same contract on
+the Sales side, keyed by `customerName`.
 
 ## Regrouping must not change the total
 
-Purchase delivery can group by transaction, vendor or product. The first is
+Purchase delivery can group by transaction, vendor or product (Sales delivery:
+transaction, customer or product). The first is
 transaction-grained and the other two line-grained — and a transaction's
 `total` carries tax that a sum of its line `amount`s does not. Using `t.total`
 for the transaction grouping made the TOTAL row jump by the tax the moment the
@@ -209,7 +473,7 @@ to the same figure.
 
 ## Gotchas
 
-- **`formatDisplayDate` and `formatAmount` come from `purchase-transactions.ts`.** Never hand-roll a formatter here.
-- The transaction-number link is only rendered for types that have a detail page — `financing` has none, so those rows show plain text rather than a link that 404s.
+- **`formatDisplayDate` and `formatAmount` come from `purchase-transactions.ts`.** Never hand-roll a formatter here. `ReportTable` formats **both** modules' money and dates through those two — the one place shared chrome still reaches into a module. It is safe only because `sales-transactions.ts` defines them identically (same `id-ID` `MONEY_FORMAT`, same `21 Aug 2026` date); the moment either module's format diverges, this has to move out the way the periods did. See § What is shared and what is mirrored.
+- The transaction-number link is only rendered for types that have a detail page — `financing` has none, so those Purchases rows show plain text rather than a link that 404s. Every Sales type has one, so Sales reports always link.
 - A column that can never say anything is worse than no column. Order completion shipped without Payment and Balance Due: an `order` in this dataset carries no `amountReceived`, so one was always `0,00` and the other always equalled Order Amount.
 - Column heads are **Title Case** ("Balance Due"), unlike the rest of the app. That's production's shared report dictionary, and reports are their own vocabulary in the product — don't sentence-case them to match other screens.

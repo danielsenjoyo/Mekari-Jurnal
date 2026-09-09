@@ -206,6 +206,12 @@ export const VENDOR_OPTIONS = [
   { name: "PT Sinar Terang", address: "Jl. Thamrin No. 88, Jakarta Pusat" }
 ];
 
+/**
+ * The **buy-side** price list: `price` is what these products cost, and it
+ * seeds a line's unit price on every Purchases form. Its counterpart in
+ * `sales-transactions.ts` is the sell-side list, deliberately marked up over
+ * these figures — see the note there before editing either.
+ */
 export const PRODUCT_OPTIONS = [
   { name: "Printer Paper A4 (Ream)", price: 55_000, unit: "pack" },
   { name: "Wireless Mouse", price: 125_000, unit: "pcs" },
