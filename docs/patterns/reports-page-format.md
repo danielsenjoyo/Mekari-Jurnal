@@ -3,24 +3,32 @@
 > A **report** screen: pick a date range and criteria, press a button, read a
 > table with a TOTAL row. Looks like an index page and isn't one.
 > Reference impl: [`app/pages/reports/purchases_list.vue`](../../app/pages/reports/purchases_list.vue)
-> — the other four Purchases reports are the same five components with
-> different columns.
+> — the other nine reports (four Purchases, five Sales) are the same five
+> components with different columns.
 > Shared chrome: [`ReportFilterBar`](../../app/components/reports/ReportFilterBar.vue),
 > [`ReportTable`](../../app/components/reports/ReportTable.vue),
 > [`ReportPagination`](../../app/components/reports/ReportPagination.vue),
 > [`ReportBlankSlate`](../../app/components/reports/ReportBlankSlate.vue),
-> [`ReportExportButton`](../../app/components/reports/ReportExportButton.vue),
-> [`PurchaseReportFilterDrawer`](../../app/components/reports/PurchaseReportFilterDrawer.vue);
-> state: [`usePurchaseReport`](../../app/composables/usePurchaseReport.ts),
-> [`useReportPaging`](../../app/composables/useReportPaging.ts);
-> data: [`purchase-report.ts`](../../app/data/purchase-report.ts),
+> [`ReportExportButton`](../../app/components/reports/ReportExportButton.vue);
+> shared data: [`report-column.ts`](../../app/data/report-column.ts),
+> [`report-period.ts`](../../app/data/report-period.ts);
+> shared state: [`useReportPaging`](../../app/composables/useReportPaging.ts).
+> Per module — Purchases:
+> [`PurchaseReportFilterDrawer`](../../app/components/reports/PurchaseReportFilterDrawer.vue),
+> [`usePurchaseReport`](../../app/composables/usePurchaseReport.ts),
+> [`purchase-report.ts`](../../app/data/purchase-report.ts),
 > [`purchase-report-variants.ts`](../../app/data/purchase-report-variants.ts),
-> [`purchase-report-filter.ts`](../../app/data/purchase-report-filter.ts),
-> [`report-column.ts`](../../app/data/report-column.ts).
+> [`purchase-report-filter.ts`](../../app/data/purchase-report-filter.ts);
+> Sales: [`SalesReportFilterDrawer`](../../app/components/reports/SalesReportFilterDrawer.vue),
+> [`useSalesReport`](../../app/composables/useSalesReport.ts),
+> [`sales-report.ts`](../../app/data/sales-report.ts),
+> [`sales-report-variants.ts`](../../app/data/sales-report-variants.ts),
+> [`sales-report-filter.ts`](../../app/data/sales-report-filter.ts).
 > See also [`index-page-format`](./index-page-format.md), [`TablePage`](./TablePage.md),
 > [`Drawer`](./Drawer.md), [`reports-index-format`](./reports-index-format.md).
 
-Ported from `jurnal-frontend-app` → `src/pages/reports/purchases_*`.
+Ported from `jurnal-frontend-app` → `src/pages/reports/purchases_*` and
+`src/pages/reports/sales_*`.
 
 ## Building one
 
@@ -28,17 +36,19 @@ A report page is columns, a row projection, and wiring. Everything else is
 shared:
 
 ```vue
-<ReportFilterBar v-model:start-date … :is-valid :is-filter-active @run @open-drawer>
+<ReportFilterBar v-model:start-date … :periods :is-valid :is-filter-active @run @open-drawer>
   <!-- optional: this report's own Sort by / Group by -->
 </ReportFilterBar>
 <PurchaseReportFilterDrawer :fields="[…]" … />
+<!-- or SalesReportFilterDrawer -->
 <ReportTable :columns :rows="pagedRows" :total-rows="filteredRows" :is-loading />
 <ReportPagination v-model:page v-model:per-page … />
 <ReportBlankSlate v-else :has-run :is-filter-active @clear />
 ```
 
-`usePurchaseReport()` owns the two filter objects and the run; `useReportPaging(filteredRows)`
-owns the footer. The page owns only `filteredRows`.
+`usePurchaseReport()` / `useSalesReport()` owns the two filter objects and the
+run; `useReportPaging(filteredRows)` owns the footer. The page owns only
+`filteredRows`.
 
 **`ReportTable` is generic** (`generic="Row extends object"`), so the `#cell`
 slot hands the page its _own_ row type rather than a `Record`. Override only the
@@ -54,6 +64,57 @@ through to the default.
 | Purchase delivery         | one delivery, or one delivered line | **Group by** switches columns _and_ row grain   |
 | Purchase by product       | one **product**, aggregated         | Filter applies per transaction, not per row     |
 | Purchase order completion | one order                           | Links order → its delivery                      |
+
+## The five Sales reports
+
+The AR mirror of the table above, one for one — same five shapes, same five
+components, `vendorName` → `customerName`:
+
+| Report                 | Rows are                            | Notable                                                      |
+| ---------------------- | ----------------------------------- | ------------------------------------------------------------ |
+| Sales list             | one transaction                     | 3 column layouts (Template ▾), sortable headers, **Deposit** |
+| Sales by customer      | one **line item**, customer-ordered | Sort by customer / total sales                               |
+| Sales delivery         | one delivery, or one delivered line | **Group by** switches columns _and_ row grain                |
+| Sales by product       | one **product**, aggregated         | Filter applies per transaction, not per row                  |
+| Sales order completion | one order                           | Links order → its delivery                                   |
+
+Two things are genuinely Sales', not a find-and-replace:
+
+- **Deposit** (Detailed layout). A customer can pay a share of an invoice up
+  front; every third invoice in the fixture carries one, so the column has
+  something to say. Its AP counterpart doesn't exist.
+- **Every transaction number is a link.** All eight Sales types have a detail
+  page, so `SALES_TRANSACTION_ROUTE` is a total `Record` — where the Purchases
+  map is `Partial`, because `financing` has no page and those numbers have to
+  render as plain text.
+
+And one omission worth naming: production's Sales order completion has a
+**Start from: Order / Quote** selector that swaps the leading columns. A
+quotation in this dataset carries no link to the order it became, so quote-first
+would render a table whose Order, Invoice and Payment columns were empty on
+every row — the same rule that dropped Payment from the Purchases version.
+
+## What is shared and what is mirrored
+
+Two modules now build reports, so the line matters:
+
+| Shared, one copy                                            | Mirrored per module                                    |
+| ----------------------------------------------------------- | ------------------------------------------------------ |
+| The five `Report*` chrome components                        | The **filter drawer** — its criteria differ            |
+| `report-column.ts` (`ReportColumn`, `ReportLayout`, totals) | `*-report.ts` — columns, layouts, route map            |
+| `report-period.ts` — the 11 presets                         | `*-report-variants.ts` — the other four reports        |
+| `useReportPaging`                                           | `*-report-filter.ts` + `use*Report` — the run contract |
+
+The rule is the one [`sales-status.ts`](../../app/data/sales-status.ts) already
+states: **anything a module could plausibly want to change on its own is
+mirrored, not shared.** A column Sales adds must not reshape the Purchases
+table.
+
+**Periods are the reason `ReportFilterBar` takes a `periods` prop.** Each
+module resolves the presets against its _own_ fixture "today"
+(`buildReportPeriods(todayIsoDate)`), so the chrome is handed a list rather than
+importing one — shared chrome reaching into one module's dataset to serve
+another module's page is exactly the coupling this split exists to prevent.
 
 ## How it differs from an index page
 
@@ -170,8 +231,10 @@ empty table needs a visible way out.
 ## Rows come from the module, not a new fixture
 
 `buildPurchaseReportRows()` projects
-[`purchase-transactions.ts`](../../app/data/purchase-transactions.ts) — the same
-array the Purchases list, detail and form pages read and write. A report over a
+[`purchase-transactions.ts`](../../app/data/purchase-transactions.ts), and
+`buildSalesReportRows()` projects
+[`sales-transactions.ts`](../../app/data/sales-transactions.ts) — the same
+arrays each module's list, detail and form pages read and write. A report over a
 parallel fixture drifts from the module it reports on, and its money and date
 formats drift with it (see [`page-recipes`](./page-recipes.md) § "one format per
 value type, per module"). Derived figures like `grossAmount` are computed in the
@@ -195,10 +258,13 @@ buildProductReportRows(type, (t) => matchesPurchaseReportFilter({ date: t.transa
 `matchesPurchaseReportFilter` reads a **structural** `FilterableReportRow`, not
 one report's row type, precisely so all five can share it. A field a report
 doesn't carry is absent, and its clause is skipped.
+`matchesSalesReportFilter` / `FilterableSalesReportRow` is the same contract on
+the Sales side, keyed by `customerName`.
 
 ## Regrouping must not change the total
 
-Purchase delivery can group by transaction, vendor or product. The first is
+Purchase delivery can group by transaction, vendor or product (Sales delivery:
+transaction, customer or product). The first is
 transaction-grained and the other two line-grained — and a transaction's
 `total` carries tax that a sum of its line `amount`s does not. Using `t.total`
 for the transaction grouping made the TOTAL row jump by the tax the moment the
@@ -209,7 +275,7 @@ to the same figure.
 
 ## Gotchas
 
-- **`formatDisplayDate` and `formatAmount` come from `purchase-transactions.ts`.** Never hand-roll a formatter here.
-- The transaction-number link is only rendered for types that have a detail page — `financing` has none, so those rows show plain text rather than a link that 404s.
+- **`formatDisplayDate` and `formatAmount` come from `purchase-transactions.ts`.** Never hand-roll a formatter here. `ReportTable` formats **both** modules' money and dates through those two — the one place shared chrome still reaches into a module. It is safe only because `sales-transactions.ts` defines them identically (same `id-ID` `MONEY_FORMAT`, same `21 Aug 2026` date); the moment either module's format diverges, this has to move out the way the periods did. See § What is shared and what is mirrored.
+- The transaction-number link is only rendered for types that have a detail page — `financing` has none, so those Purchases rows show plain text rather than a link that 404s. Every Sales type has one, so Sales reports always link.
 - A column that can never say anything is worse than no column. Order completion shipped without Payment and Balance Due: an `order` in this dataset carries no `amountReceived`, so one was always `0,00` and the other always equalled Order Amount.
 - Column heads are **Title Case** ("Balance Due"), unlike the rest of the app. That's production's shared report dictionary, and reports are their own vocabulary in the product — don't sentence-case them to match other screens.

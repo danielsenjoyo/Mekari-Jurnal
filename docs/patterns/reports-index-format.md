@@ -93,10 +93,12 @@ what an old link opens.
 ## Where a card goes
 
 Every card links to `/reports/<slug>`. A slug with a real page wins — Nuxt
-prefers a static route over the dynamic one — so the five built reports
+prefers a static route over the dynamic one — so the ten built reports
 (`purchases_list`, `purchases_by_vendor`, `purchases_delivery`,
-`purchases_by_product`, `purchases_order_completion`) resolve to their own
-pages, built to [`reports-page-format`](./reports-page-format.md).
+`purchases_by_product`, `purchases_order_completion`, and their Sales
+counterparts `sales_list`, `sales_by_customer`, `sales_delivery`,
+`sales_by_product`, `sales_order_completion`) resolve to their own pages, built
+to [`reports-page-format`](./reports-page-format.md).
 
 Every other slug falls through to the stub
 [`[report].vue`](../../app/pages/reports/%5Breport%5D.vue): a
