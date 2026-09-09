@@ -29,6 +29,7 @@ import {
   type SalesReportRow
 } from "./sales-report";
 import { SALES_STATUS_LABEL, type SalesStatus } from "./sales-status";
+import { parseLocalIsoDate } from "~/utils/dates";
 import {
   PRODUCT_OPTIONS,
   TRANSACTION_TYPE_LABEL,
@@ -461,6 +462,191 @@ export function buildJoinInvoiceRows(): JoinInvoiceRow[] {
     ...row,
     invoiceCount: byId.get(row.id)?.joinedInvoiceIds.length ?? 0
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Customer balance / Aged receivable
+//
+// The two **as-of-date** reports: not "what happened between two dates" but
+// "what was owed on one". Neither has a page in `jurnal-frontend-app` to port
+// — production renders both server-side — so both are built to
+// `docs/patterns/reports-page-format.md` § As of a date, not cloned.
+// ---------------------------------------------------------------------------
+
+/**
+ * What an invoice still owed at the end of `asOfIso`.
+ *
+ * The stored `balanceDue` is only ever *today's* answer. Rewinding it means
+ * adding back everything settled after the day being asked about, which is
+ * what `payment.dateSort` and `creditMemo.dateSort` exist for: an invoice paid
+ * on 20 Sep was fully outstanding on 15 Sep, and a report that showed it as
+ * settled would be reporting the present while claiming to report the past.
+ *
+ * Returns 0 for an invoice not yet raised on that date — it cannot be owed
+ * before it exists.
+ */
+function balanceAsOf(t: SalesTransaction, asOfIso: string): number {
+  if (t.transactionDateSort > asOfIso) return 0;
+  const settled =
+    t.payments.reduce((sum, p) => (p.dateSort <= asOfIso ? sum + p.amount : sum), 0) +
+    t.creditMemos.reduce((sum, m) => (m.dateSort <= asOfIso ? sum + m.amount : sum), 0);
+  return Math.max(0, t.total - settled);
+}
+
+/** Days past due at `asOfIso`; 0 or less means not yet due. */
+function daysOverdue(t: SalesTransaction, asOfIso: string): number {
+  const due = parseLocalIsoDate(t.dueDateSort).getTime();
+  const asOf = parseLocalIsoDate(asOfIso).getTime();
+  return Math.round((asOf - due) / 86_400_000);
+}
+
+export interface CustomerBalanceRow {
+  id: number;
+  customerName: string;
+  date: string;
+  number: string;
+  dueDate: string;
+  status: SalesStatus;
+  statusLabel: string;
+  total: number;
+  paid: number;
+  balanceDue: number;
+  daysOverdue: number;
+}
+
+export const CUSTOMER_BALANCE_COLUMNS: ReportColumn<keyof CustomerBalanceRow & string>[] = [
+  { key: "customerName", label: "Customer", labelId: "Pelanggan", width: 200 },
+  { key: "date", label: "Invoice Date", labelId: "Tanggal Faktur", format: "date", width: 130 },
+  { key: "number", label: "Invoice No.", labelId: "No. Faktur", width: 190 },
+  { key: "dueDate", label: "Due Date", labelId: "Jatuh Tempo", format: "date", width: 120 },
+  { key: "status", label: "Status", labelId: "Status", width: 120 },
+  { key: "total", label: "Invoice Amount", labelId: "Jumlah Faktur", format: "money", width: 170 },
+  { key: "paid", label: "Paid", labelId: "Dibayar", format: "money", width: 160 },
+  {
+    key: "daysOverdue",
+    label: "Days Overdue",
+    labelId: "Hari Lewat Jatuh Tempo",
+    format: "number",
+    // Summing days is meaningless — this column describes each row, not the set.
+    total: false,
+    width: 130
+  },
+  { key: "balanceDue", label: "Balance Due", labelId: "Sisa Tagihan", format: "money", width: 170 }
+];
+
+/**
+ * One row per invoice still unpaid on the given date, customer-ordered.
+ *
+ * A settled invoice is absent rather than present at zero: this report exists
+ * to answer "who owes us what", and a paid invoice is not an answer to it. That
+ * also makes the TOTAL row the receivable balance itself.
+ *
+ * Production's card promises credit-memo balances alongside the invoices. A
+ * memo is subtracted inside `balanceAsOf` rather than given a column of its
+ * own: the generator creates none (they only arrive from `applyCreditMemo` at
+ * runtime), so the column would read `0,00` on every row of a fresh load.
+ */
+export function buildCustomerBalanceRows(asOfIso: string): CustomerBalanceRow[] {
+  return getSalesTransactions()
+    .filter((t) => t.type === "invoice" && t.status !== "rejected")
+    .map((t) => ({ t, balance: balanceAsOf(t, asOfIso) }))
+    .filter(({ balance }) => balance > 0)
+    .map(({ t, balance }) => ({
+      id: t.id,
+      customerName: t.customerName,
+      date: t.transactionDateSort,
+      number: t.number,
+      dueDate: t.dueDateSort,
+      status: t.status,
+      statusLabel: SALES_STATUS_LABEL[t.status],
+      total: t.total,
+      paid: t.total - balance,
+      balanceDue: balance,
+      daysOverdue: Math.max(0, daysOverdue(t, asOfIso))
+    }))
+    .sort(
+      (a, b) => a.customerName.localeCompare(b.customerName) || a.dueDate.localeCompare(b.dueDate)
+    );
+}
+
+/**
+ * The five buckets, in the order the columns appear. `from`/`to` are days past
+ * due, inclusive; `to: null` is the open-ended last bucket.
+ *
+ * Production's card names 30, 60, 90 and "after 90 days", which is four
+ * boundaries and therefore five columns once "not yet due" is counted — that
+ * one is the whole point of the report, since a receivable that isn't late yet
+ * is the healthy part of the balance.
+ */
+export const AGING_BUCKETS = [
+  { key: "current", label: "Current", labelId: "Belum Jatuh Tempo", from: -Infinity, to: 0 },
+  { key: "days1to30", label: "1–30 Days", labelId: "1–30 Hari", from: 1, to: 30 },
+  { key: "days31to60", label: "31–60 Days", labelId: "31–60 Hari", from: 31, to: 60 },
+  { key: "days61to90", label: "61–90 Days", labelId: "61–90 Hari", from: 61, to: 90 },
+  { key: "over90", label: "> 90 Days", labelId: "> 90 Hari", from: 91, to: null }
+] as const;
+
+export type AgingBucketKey = (typeof AGING_BUCKETS)[number]["key"];
+
+export type AgedReceivableRow = {
+  id: string;
+  customerName: string;
+  total: number;
+} & Record<AgingBucketKey, number>;
+
+export const AGED_RECEIVABLE_COLUMNS: ReportColumn<keyof AgedReceivableRow & string>[] = [
+  { key: "customerName", label: "Customer", labelId: "Pelanggan", width: 220 },
+  ...AGING_BUCKETS.map((b) => ({
+    key: b.key,
+    label: b.label,
+    labelId: b.labelId,
+    format: "money" as const,
+    width: 150
+  })),
+  { key: "total", label: "Total", labelId: "Total", format: "money", width: 170 }
+];
+
+/**
+ * One row per customer, their receivable split by how late it is.
+ *
+ * Built from the same `balanceAsOf` as Customer balance, so the two reports
+ * reconcile: run both on the same date and this one's TOTAL equals that one's.
+ * Every invoice lands in exactly one bucket — the row is a partition of the
+ * customer's balance, not five overlapping measures — which is what makes the
+ * per-row Total the sum of its own buckets.
+ */
+export function buildAgedReceivableRows(asOfIso: string): AgedReceivableRow[] {
+  const byCustomer = new Map<string, AgedReceivableRow>();
+
+  getSalesTransactions()
+    .filter((t) => t.type === "invoice" && t.status !== "rejected")
+    .forEach((t) => {
+      const balance = balanceAsOf(t, asOfIso);
+      if (balance <= 0) return;
+
+      const row =
+        byCustomer.get(t.customerName) ??
+        ({
+          id: t.customerName,
+          customerName: t.customerName,
+          current: 0,
+          days1to30: 0,
+          days31to60: 0,
+          days61to90: 0,
+          over90: 0,
+          total: 0
+        } satisfies AgedReceivableRow);
+
+      const late = daysOverdue(t, asOfIso);
+      const bucket =
+        AGING_BUCKETS.find((b) => late >= b.from && (b.to === null || late <= b.to)) ??
+        AGING_BUCKETS[0];
+      row[bucket.key] += balance;
+      row.total += balance;
+      byCustomer.set(t.customerName, row);
+    });
+
+  return [...byCustomer.values()].sort((a, b) => a.customerName.localeCompare(b.customerName));
 }
 
 // ---------------------------------------------------------------------------

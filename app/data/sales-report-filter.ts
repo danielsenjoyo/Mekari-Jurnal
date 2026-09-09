@@ -22,7 +22,7 @@ import {
   SALES_REPORT_PERIODS,
   type DateBy
 } from "./sales-report";
-import type { TransactionType } from "./sales-transactions";
+import { todayIsoDate, type TransactionType } from "./sales-transactions";
 import { dmyToIso, isoToDmy } from "~/utils/dates";
 
 export interface SalesReportFilter {
@@ -41,6 +41,9 @@ export interface SalesReportFilter {
   /** Product names. Only the product-grained reports offer this — a
    *  transaction-grained row has no single product to match against. */
   products: string[];
+  /** The single day a balance report is asked about, DD/MM/YYYY. Unused by the
+   *  range reports; see `ReportFilterBar`'s `mode` prop. */
+  asOfDate: string;
 }
 
 export function defaultSalesReportFilter(): SalesReportFilter {
@@ -56,7 +59,9 @@ export function defaultSalesReportFilter(): SalesReportFilter {
     statuses: [],
     tags: [],
     tagsLogic: "and",
-    products: []
+    products: [],
+    // The fixture's today, so a balance report opens on "what is owed now".
+    asOfDate: isoToDmy(todayIsoDate())
   };
 }
 
@@ -122,4 +127,9 @@ export function matchesSalesReportFilter(
  *  Filter button on the same condition. */
 export function isReportRangeValid(f: SalesReportFilter): boolean {
   return Boolean(dmyToIso(f.startDate) && dmyToIso(f.endDate));
+}
+
+/** The as-of-date reports have one date to validate instead of two. */
+export function isReportAsOfValid(f: SalesReportFilter): boolean {
+  return Boolean(dmyToIso(f.asOfDate));
 }

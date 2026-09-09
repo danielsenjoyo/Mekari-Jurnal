@@ -83,6 +83,10 @@ export interface SalesTransactionTax {
 export interface SalesTransactionPayment {
   id: number;
   date: string;
+  /** `YYYY-MM-DD` alongside the display `date`, so a report can ask what had
+   *  been paid *as of* some day (Customer balance, Aged receivable) rather
+   *  than only what is owed right now. */
+  dateSort: string;
   number: string;
   method: string;
   amount: number;
@@ -91,6 +95,8 @@ export interface SalesTransactionPayment {
 export interface SalesCreditMemo {
   id: number;
   date: string;
+  /** `YYYY-MM-DD`, for the same reason as `SalesTransactionPayment.dateSort`. */
+  dateSort: string;
   number: string;
   amount: number;
 }
@@ -425,20 +431,17 @@ function buildTransaction(type: TransactionType, i: number, seq: number): SalesT
 
   let amountReceived = 0;
   const payments: SalesTransactionPayment[] = [];
-  if (status === "paid") {
-    amountReceived = total;
+  // Paid a few days after the invoice was raised. The date matters: the
+  // as-of-date reports (Customer balance, Aged receivable) rewind the balance
+  // by dropping payments made after the day being asked about, so a payment
+  // with no position in time would make those two reports meaningless.
+  const paidOn = dateAt(-i * 3 + 5);
+  if (status === "paid" || status === "partial") {
+    amountReceived = status === "paid" ? total : Math.round(total * 0.4);
     payments.push({
       id: 1,
-      date: formatDate(dateAt(-i * 3 + 5)),
-      number: `RCV/2026/09/${pad(seq)}`,
-      method: PAYMENT_METHODS[i % PAYMENT_METHODS.length]!,
-      amount: total
-    });
-  } else if (status === "partial") {
-    amountReceived = Math.round(total * 0.4);
-    payments.push({
-      id: 1,
-      date: formatDate(dateAt(-i * 3 + 5)),
+      date: formatDate(paidOn),
+      dateSort: toLocalIsoDate(paidOn),
       number: `RCV/2026/09/${pad(seq)}`,
       method: PAYMENT_METHODS[i % PAYMENT_METHODS.length]!,
       amount: amountReceived
@@ -858,6 +861,7 @@ export function applyCreditMemo(
   record.creditMemos.push({
     id: record.creditMemos.length + 1,
     date: todayDisplayDate(),
+    dateSort: todayIsoDate(),
     number,
     amount: applied
   });

@@ -93,18 +93,19 @@ what an old link opens.
 ## Where a card goes
 
 Every card links to `/reports/<slug>`. A slug with a real page wins — Nuxt
-prefers a static route over the dynamic one — so the thirteen built reports
+prefers a static route over the dynamic one — so the fifteen built reports
 (`purchases_list`, `purchases_by_vendor`, `purchases_delivery`,
 `purchases_by_product`, `purchases_order_completion`, their Sales counterparts
 `sales_list`, `sales_by_customer`, `sales_delivery`, `sales_by_product`,
 `sales_order_completion`, plus `product_profitability`,
-`proforma_invoice_list` and `merged_invoice_list`) resolve to their own pages,
-built to [`reports-page-format`](./reports-page-format.md).
+`proforma_invoice_list`, `merged_invoice_list`, `customer_balance` and
+`aged_receivable`) resolve to their own pages, built to
+[`reports-page-format`](./reports-page-format.md).
 
-The Sales tab's two remaining stubs, `customer_balance` and `aged_receivable`,
-have no page to port from either — and unlike the two invoice lists, neither is
-the Sales list pinned to a type: both are balance-at-a-date reports, and aged
-receivable needs 30/60/90/90+ bucketing that no screen here demonstrates yet.
+Every card on the Sales tab now lands on a real page. The last two —
+`customer_balance` and `aged_receivable` — are the only ones that are not
+range reports; see [`reports-page-format`](./reports-page-format.md) § As of a
+date, not over a range.
 
 Every other slug falls through to the stub
 [`[report].vue`](../../app/pages/reports/%5Breport%5D.vue): a

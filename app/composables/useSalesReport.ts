@@ -2,6 +2,7 @@ import { computed, reactive, ref } from "vue";
 import { SALES_REPORT_PERIODS } from "~/data/sales-report";
 import {
   defaultSalesReportFilter,
+  isReportAsOfValid,
   isReportFilterActive,
   isReportRangeValid,
   type SalesReportFilter
@@ -25,6 +26,12 @@ import {
 export function useSalesReport(options?: {
   /** Report-specific defaults — e.g. Delivery pins `transactionType`. */
   defaults?: Partial<SalesReportFilter>;
+  /**
+   * `range` (default) validates the two dates; `as-of` validates the single
+   * one, and writes it into the meta strip instead of a range. Must match the
+   * `mode` handed to `ReportFilterBar`.
+   */
+  mode?: "range" | "as-of";
   /** Runs after each successful run — the page resets its pager here. */
   onRun?: () => void;
 }) {
@@ -39,7 +46,10 @@ export function useSalesReport(options?: {
   const isLoading = ref(false);
 
   const hasRun = computed(() => applied.value !== null);
-  const isRangeValid = computed(() => isReportRangeValid(filter));
+  const isAsOf = options?.mode === "as-of";
+  const isRangeValid = computed(() =>
+    isAsOf ? isReportAsOfValid(filter) : isReportRangeValid(filter)
+  );
   const isDrawerFilterActive = computed(() => isReportFilterActive(filter));
 
   function snapshot(): SalesReportFilter {
@@ -85,6 +95,9 @@ export function useSalesReport(options?: {
   function metaLine(subject: string): string {
     const f = applied.value;
     if (!f) return "";
+    // A balance report has one date and no period — printing a range it never
+    // used would misdescribe the table underneath it.
+    if (isAsOf) return `${subject} · As of ${f.asOfDate} · IDR`;
     const period = SALES_REPORT_PERIODS.find((p) => p.id === f.periodId);
     const label = period && period.id !== "custom" ? period.label : "Custom range";
     return `${subject} · ${label} · ${f.startDate} – ${f.endDate} · IDR`;

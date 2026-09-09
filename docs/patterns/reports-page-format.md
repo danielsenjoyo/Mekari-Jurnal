@@ -3,7 +3,7 @@
 > A **report** screen: pick a date range and criteria, press a button, read a
 > table with a TOTAL row. Looks like an index page and isn't one.
 > Reference impl: [`app/pages/reports/purchases_list.vue`](../../app/pages/reports/purchases_list.vue)
-> — the other twelve reports (four Purchases, eight Sales) are the same five
+> — the other fourteen reports (four Purchases, ten Sales) are the same five
 > components with different columns.
 > Shared chrome: [`ReportFilterBar`](../../app/components/reports/ReportFilterBar.vue),
 > [`ReportTable`](../../app/components/reports/ReportTable.vue),
@@ -65,31 +65,37 @@ through to the default.
 | Purchase by product       | one **product**, aggregated         | Filter applies per transaction, not per row     |
 | Purchase order completion | one order                           | Links order → its delivery                      |
 
-## The eight Sales reports
+## The ten Sales reports
 
 The first five are the AR mirror of the table above, one for one — same five
-shapes, same five components, `vendorName` → `customerName`. The last three
+shapes, same five components, `vendorName` → `customerName`. The last five
 have no AP counterpart:
 
-| Report                 | Rows are                            | Notable                                                        |
-| ---------------------- | ----------------------------------- | -------------------------------------------------------------- |
-| Sales list             | one transaction                     | 3 column layouts (Template ▾), sortable headers, **Deposit**   |
-| Sales by customer      | one **line item**, customer-ordered | Sort by customer / total sales                                 |
-| Sales delivery         | one delivery, or one delivered line | **Group by** switches columns _and_ row grain                  |
-| Sales by product       | one **product**, aggregated         | Filter applies per transaction, not per row                    |
-| Sales order completion | one order                           | Links order → its delivery                                     |
-| Product profitability  | one **product** sold, aggregated    | **Reads both ledgers** — sales for revenue, purchases for cost |
-| Pro forma invoice list | one pro forma invoice               | The Sales list pinned to one type, minus Deposit               |
-| Join invoice list      | one join invoice                    | Nine columns, not sixteen — see below                          |
+| Report                 | Rows are                             | Notable                                                        |
+| ---------------------- | ------------------------------------ | -------------------------------------------------------------- |
+| Sales list             | one transaction                      | 3 column layouts (Template ▾), sortable headers, **Deposit**   |
+| Sales by customer      | one **line item**, customer-ordered  | Sort by customer / total sales                                 |
+| Sales delivery         | one delivery, or one delivered line  | **Group by** switches columns _and_ row grain                  |
+| Sales by product       | one **product**, aggregated          | Filter applies per transaction, not per row                    |
+| Sales order completion | one order                            | Links order → its delivery                                     |
+| Product profitability  | one **product** sold, aggregated     | **Reads both ledgers** — sales for revenue, purchases for cost |
+| Pro forma invoice list | one pro forma invoice                | The Sales list pinned to one type, minus Deposit               |
+| Join invoice list      | one join invoice                     | Nine columns, not sixteen — see below                          |
+| Customer balance       | one unpaid invoice, customer-ordered | **As of one date**, not a range                                |
+| Aged receivable        | one customer                         | **As of one date**; columns are age bands, not fields          |
 
-### Two of them were built, not ported
+### Four of them were built, not ported
 
-Pro forma invoice list and Join invoice list have **no Vue page in
-`jurnal-frontend-app`** — like Customer balance and Aged receivable, production
-still renders them server-side. What their cards on the Reports index promise
-("Shows all created proforma invoices in a certain period") is the Sales list
-pinned to one transaction type, so that is what they are: same composable, same
-drawer, `defaults: { transactionType }` and a column set of their own.
+Pro forma invoice list, Join invoice list, Customer balance and Aged receivable
+have **no Vue page in `jurnal-frontend-app`** to port — production still renders
+all four server-side. They are built to this document instead, from what their
+cards on the Reports index promise.
+
+For the two invoice lists that promise is the Sales list pinned to one
+transaction type ("Shows all created proforma invoices in a certain period"), so
+that is what they are: same composable, same drawer,
+`defaults: { transactionType }` and a column set of their own. The other two are
+a different shape entirely — see § As of a date, not over a range.
 
 **Their column sets are trimmed to what the document actually carries**, which
 is the whole reason they aren't literally `sales_list`. A join invoice has no
@@ -120,6 +126,56 @@ And one omission worth naming: production's Sales order completion has a
 quotation in this dataset carries no link to the order it became, so quote-first
 would render a table whose Order, Invoice and Payment columns were empty on
 every row — the same rule that dropped Payment from the Purchases version.
+
+## As of a date, not over a range
+
+Customer balance and Aged receivable ask a different question from every other
+report here: not "what happened between two dates" but **"what was owed on
+one"**. A balance has no start — it carries forward from the beginning of the
+ledger — so a start date and a period preset would both be lies.
+
+`ReportFilterBar` takes `mode="as-of"`: one **As of date** field, no period
+select. `useSalesReport({ mode: "as-of" })` matches it, validating the single
+date and writing `As of 02/09/2026` into the meta strip instead of a range.
+`ReportBlankSlate` takes the same `mode` — its production copy names the two
+controls it expects you to touch ("Select dates or period"), and pointing at a
+period select that isn't on screen is worse than no instruction.
+
+**Pass `mode` to all three or none.** They describe the same screen; a bar in
+one mode under a blank slate in the other contradicts itself.
+
+### Rewinding the balance
+
+The stored `balanceDue` is only ever _today's_ answer. `balanceAsOf()` reverses
+it by adding back everything settled after the day in question, which is what
+`payment.dateSort` and `creditMemo.dateSort` were added for — an invoice paid
+on 20 Sep was fully outstanding on 15 Sep, and a report that showed it settled
+would be reporting the present while claiming to report the past. An invoice
+not yet raised on that date contributes nothing: it cannot be owed before it
+exists.
+
+**A settled invoice is absent, not present at zero.** The report answers "who
+owes us what", and a paid invoice is not an answer — which is also what makes
+the TOTAL row the receivable balance itself.
+
+### The two must reconcile
+
+Aged receivable is the same `balanceAsOf` grouped by customer instead of listed
+by invoice, and every invoice lands in exactly one bucket. So on any given date
+**Aged receivable's Total equals Customer balance's Balance Due total** — a row
+is a partition of a customer's balance, not five overlapping measures. Verified
+at 02/09/2026: both report 67.197.757,00.
+
+Changing the as-of date must redistribute that figure without changing it. At
+02/09 the fixture's invoices are all under 30 days late, so only Current and
+1–30 carry anything; at 31/12 every one of them has aged into > 90 Days — and
+the total is 67.197.757,00 both times. **If a date change moves the total, the
+bucketing is double-counting.**
+
+The three empty buckets at today's date are the one place this report bends the
+"no column that can never say anything" rule, and deliberately: they are empty
+_at this date_, not structurally, and the whole point of the as-of control is
+that moving it fills them.
 
 ## The one report that reads both ledgers
 
