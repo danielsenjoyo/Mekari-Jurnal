@@ -50,6 +50,38 @@
           <MpFormErrorMessage>Choose the invoice this return credits.</MpFormErrorMessage>
         </MpFormControl>
 
+        <!-- Which deliveries the goods are coming back on. Only offered when
+             the chosen invoice actually bills for one — an invoice with no
+             delivery is returned against as a whole, which is the simpler and
+             more common case. -->
+        <MpFormControl v-if="availableDeliveries.length">
+          <MpFormLabel>Delivery no.</MpFormLabel>
+          <MpFlex direction="column" gap="2" align-items="flex-start">
+            <MpButton variant="secondary" size="sm" @click="isDeliveryDrawerOpen = true">
+              {{ selectedDeliveries.length ? "Change delivery" : "Select delivery" }}
+            </MpButton>
+            <MpFlex v-if="selectedDeliveries.length" gap="2" wrap="wrap">
+              <MpTag
+                v-for="delivery in selectedDeliveries"
+                :key="delivery.id"
+                variant="gray"
+                size="sm"
+                is-closable
+                @close="removeDelivery(delivery.id)"
+              >
+                {{ delivery.number }}
+              </MpTag>
+            </MpFlex>
+          </MpFlex>
+          <MpFormHelpText>
+            {{
+              selectedDeliveries.length
+                ? "Returnable quantities are capped at what these deliveries shipped."
+                : "Optional — returning against the whole invoice instead."
+            }}
+          </MpFormHelpText>
+        </MpFormControl>
+
         <MpFormControl>
           <MpFormLabel>Billing address</MpFormLabel>
           <MpTextarea v-model="form.customerAddress" :class="addressFieldClass" is-full-width />
@@ -191,7 +223,16 @@
           </MpTableRow>
         </MpTableHead>
         <MpTableBody>
-          <MpTableRow v-for="line in form.lines" :key="line.key">
+          <template v-for="group in lineGroups" :key="group.key">
+            <!-- A group header only earns its row when the lines are actually
+                 split across deliveries; with one source there is nothing to
+                 tell apart, and the header would be noise. -->
+            <MpTableRow v-if="group.label">
+              <MpTableCell as="td" :colspan="7" :class="groupHeaderClass">
+                <MpText size="label" weight="semiBold" color="dark">{{ group.label }}</MpText>
+              </MpTableCell>
+            </MpTableRow>
+            <MpTableRow v-for="line in group.lines" :key="line.key">
             <MpTableCell as="td" :class="lineCellClass">
               <MpText>{{ line.product }}</MpText>
             </MpTableCell>
@@ -226,7 +267,8 @@
             <MpTableCell as="td" :class="[lineCellClass, numCellClass]">
               <MpText>{{ formatCurrency(computeLineAmount(line)) }}</MpText>
             </MpTableCell>
-          </MpTableRow>
+            </MpTableRow>
+          </template>
 
           <MpTableRow v-if="!form.lines.length">
             <MpTableCell as="td" :colspan="7" :class="emptyCellClass">
@@ -257,6 +299,19 @@
         <MpFormControl>
           <MpFormLabel>Memo</MpFormLabel>
           <MpTextarea v-model="form.memo" placeholder="Memo" is-full-width />
+        </MpFormControl>
+        <MpFormControl>
+          <MpFormLabel>Attachments</MpFormLabel>
+          <MpUpload
+            placeholder="or drag & drop file here"
+            accept=".xlsx,.xls,.doc,.docx,.pdf,.jpg,.jpeg,.png,.zip"
+            is-multiple
+            is-full-width
+            @change="onAttachmentChange"
+          />
+          <MpFormHelpText>
+            Files can be Excel, Word, PDF, JPG, PNG, or ZIP (maximum 5 files and 10 MB per file).
+          </MpFormHelpText>
         </MpFormControl>
       </div>
 
@@ -339,6 +394,13 @@
         </MpPopover>
       </MpFlex>
     </div>
+    <SalesReturnDeliveryDrawer
+      :is-open="isDeliveryDrawerOpen"
+      :deliveries="availableDeliveries"
+      :selected="form.deliveryIds"
+      @close="isDeliveryDrawerOpen = false"
+      @apply="onApplyDeliveries"
+    />
   </DefaultPageContent>
 </template>
 
@@ -377,9 +439,11 @@ import {
   MpTag,
   MpText,
   MpTextarea,
-  MpTooltip
+  MpTooltip,
+  MpUpload
 } from "@mekari/pixel3";
 import DefaultPageContent from "~/components/template/DefaultPageContent.vue";
+import SalesReturnDeliveryDrawer from "~/components/sales/SalesReturnDeliveryDrawer.vue";
 import {
   TAG_OPTIONS,
   TRANSACTION_TYPE_LABEL,
@@ -387,6 +451,7 @@ import {
   computeTransactionTotals,
   computeLineAmount,
   createTransaction,
+  deliveriesForInvoice,
   emptyTransactionInput,
   formatCurrency,
   getSalesTransactionById,
@@ -424,6 +489,9 @@ const existing = computed(() =>
 
 interface LineForm {
   key: number;
+  /** Which delivery this line came back on, when the return is raised against
+   *  deliveries rather than the invoice as a whole. */
+  deliveryId: number | null;
   product: string;
   description: string;
   quantity: number;
@@ -439,6 +507,7 @@ let lineKeySeq = 0;
 
 const form = reactive({
   linkedInvoiceId: null as number | null,
+  deliveryIds: [] as number[],
   customerName: "",
   customerAddress: "",
   shippingAddress: "",
@@ -453,8 +522,10 @@ const form = reactive({
   lines: [] as LineForm[]
 });
 const emailText = ref("");
+const isDeliveryDrawerOpen = ref(false);
 const priceIncludesTax = ref(false);
 const discountValue = ref(0);
+const attachments = ref<string[]>([]);
 const submitted = ref(false);
 
 function addDays(date: Date, days: number): Date {
@@ -477,6 +548,47 @@ const linkedInvoice = computed(() =>
   form.linkedInvoiceId != null ? getSalesTransactionById(form.linkedInvoiceId) : undefined
 );
 
+/** The deliveries this invoice bills for — the return's possible sources. */
+const availableDeliveries = computed<SalesTransaction[]>(() =>
+  form.linkedInvoiceId != null ? deliveriesForInvoice(form.linkedInvoiceId) : []
+);
+const selectedDeliveries = computed<SalesTransaction[]>(() =>
+  form.deliveryIds
+    .map((id) => getSalesTransactionById(id))
+    .filter((t): t is SalesTransaction => Boolean(t))
+);
+
+function onApplyDeliveries(deliveryIds: number[]) {
+  const kept = enteredQuantities();
+  form.deliveryIds = deliveryIds;
+  isDeliveryDrawerOpen.value = false;
+  loadLines(kept);
+}
+function removeDelivery(id: number) {
+  onApplyDeliveries(form.deliveryIds.filter((x) => x !== id));
+}
+
+/** The line rows, split by the delivery they came back on. One group with no
+ *  label is the ungrouped case — see the template's note on why a lone header
+ *  would be noise. */
+const lineGroups = computed(() => {
+  if (!form.deliveryIds.length) {
+    return [{ key: "invoice", label: "", lines: form.lines }];
+  }
+  return form.deliveryIds
+    .map((deliveryId) => {
+      const delivery = getSalesTransactionById(deliveryId);
+      return {
+        key: String(deliveryId),
+        // The number already reads "Sales Delivery #24042", so prefixing it again
+        // would stutter — the source app prefixes because its numbers are bare.
+        label: delivery?.number ?? `Delivery ${deliveryId}`,
+        lines: form.lines.filter((l) => l.deliveryId === deliveryId)
+      };
+    })
+    .filter((group) => group.lines.length > 0);
+});
+
 /** The source app's rule: goods can't come back before they were invoiced.
  *  Compared on the sortable ISO form, so it's a plain string comparison. */
 const returnDateTooEarly = computed(() => {
@@ -487,28 +599,73 @@ const returnDateTooEarly = computed(() => {
 });
 
 /** Rebuilds the line rows from an invoice, capping each at what's returnable.
- *  `keep` carries over quantities already entered (used when editing). */
-function loadLinesFromInvoice(invoiceId: number, keep?: Map<string, number>) {
-  const invoice = getSalesTransactionById(invoiceId);
-  if (!invoice) {
+ *  `keep` carries over quantities already entered (used when editing).
+ *
+ *  With deliveries chosen, the rows come from THOSE deliveries instead — one
+ *  row per product per delivery — and each is capped by two things at once:
+ *  what that delivery shipped, and what the invoice still has left to return.
+ *  Either bound alone would let a return overstate itself. */
+function loadLines(keep?: Map<string, number>) {
+  const invoiceId = form.linkedInvoiceId;
+  const invoice = invoiceId != null ? getSalesTransactionById(invoiceId) : undefined;
+  if (!invoice || invoiceId == null) {
     form.lines = [];
     return;
   }
   const remaining = returnableQuantities(invoiceId, props.recordId);
-  form.lines = invoice.lines.map((l) => {
-    const max = Math.max(0, remaining.get(l.product) ?? 0);
-    return {
+
+  if (!form.deliveryIds.length) {
+    form.lines = invoice.lines.map((l) => ({
       key: ++lineKeySeq,
+      deliveryId: null,
       product: l.product,
       description: l.description,
-      quantity: keep?.get(l.product) ?? 0,
-      maxQuantity: max,
+      quantity: keep?.get(lineKeyFor(null, l.product)) ?? 0,
+      maxQuantity: Math.max(0, remaining.get(l.product) ?? 0),
       unit: l.unit,
       unitPrice: l.unitPrice,
       discountPercent: l.discountPercent,
       tax: l.tax
-    };
-  });
+    }));
+    return;
+  }
+
+  // Invoice lines carry the pricing; the deliveries carry the quantities. A
+  // product shipped on two deliveries gets a row under each.
+  const priced = new Map(invoice.lines.map((l) => [l.product, l]));
+  const rows: LineForm[] = [];
+  for (const deliveryId of form.deliveryIds) {
+    const delivery = getSalesTransactionById(deliveryId);
+    if (delivery?.type !== "delivery") continue;
+    for (const line of delivery.lines) {
+      const invoiceLine = priced.get(line.product);
+      if (!invoiceLine) continue; // shipped but not on this invoice
+      rows.push({
+        key: ++lineKeySeq,
+        deliveryId,
+        product: line.product,
+        description: invoiceLine.description,
+        quantity: keep?.get(lineKeyFor(deliveryId, line.product)) ?? 0,
+        maxQuantity: Math.min(line.quantity, Math.max(0, remaining.get(line.product) ?? 0)),
+        unit: invoiceLine.unit,
+        unitPrice: invoiceLine.unitPrice,
+        discountPercent: invoiceLine.discountPercent,
+        tax: invoiceLine.tax
+      });
+    }
+  }
+  form.lines = rows;
+}
+
+/** Identifies a row across a reload. Product alone is not enough once the same
+ *  product can appear under two deliveries. */
+function lineKeyFor(deliveryId: number | null, product: string) {
+  return `${deliveryId ?? "invoice"}::${product}`;
+}
+
+/** Quantities currently entered, so a reload doesn't discard them. */
+function enteredQuantities(): Map<string, number> {
+  return new Map(form.lines.map((l) => [lineKeyFor(l.deliveryId, l.product), l.quantity]));
 }
 
 function applyInvoice(invoice: SalesTransaction) {
@@ -528,7 +685,8 @@ function onInvoiceChange(next: unknown) {
   }
   const invoice = getSalesTransactionById(id);
   if (invoice) applyInvoice(invoice);
-  loadLinesFromInvoice(id);
+  form.deliveryIds = [];
+  loadLines();
 }
 
 function loadFromExisting() {
@@ -548,11 +706,13 @@ function loadFromExisting() {
   form.tags = [...r.tags];
   form.message = r.message;
   form.memo = r.memo;
+  attachments.value = [...r.attachments];
   emailText.value = r.email.join(", ");
   priceIncludesTax.value = r.priceIncludesTax;
   discountValue.value = r.discountValue;
   if (r.linkedInvoiceId != null) {
-    loadLinesFromInvoice(r.linkedInvoiceId, new Map(r.lines.map((l) => [l.product, l.quantity])));
+    form.deliveryIds = [...r.deliveryIds];
+    loadLines(new Map(r.lines.map((l) => [lineKeyFor(l.deliveryId ?? null, l.product), l.quantity])));
   }
 }
 watch(existing, loadFromExisting, { immediate: true });
@@ -567,7 +727,7 @@ watch(
     if (invoice?.type !== "invoice") return;
     form.linkedInvoiceId = invoice.id;
     applyInvoice(invoice);
-    loadLinesFromInvoice(invoice.id);
+    loadLines();
   },
   { immediate: true }
 );
@@ -633,10 +793,17 @@ const missingFields = computed(() => {
   return missing;
 });
 
+function onAttachmentChange(event: Event) {
+  const files = (event.target as HTMLInputElement)?.files;
+  // Names only — this prototype never uploads or stores the bytes.
+  attachments.value = files ? [...files].map((f) => f.name) : [];
+}
+
 function buildInput(): SalesTransactionInput {
   return {
     ...emptyTransactionInput(),
     linkedInvoiceId: form.linkedInvoiceId,
+    deliveryIds: [...form.deliveryIds],
     customerName: form.customerName,
     customerAddress: form.customerAddress,
     email: emailText.value
@@ -656,7 +823,9 @@ function buildInput(): SalesTransactionInput {
     discountValue: discountValue.value,
     message: form.message,
     memo: form.memo,
+    attachments: attachments.value,
     lines: returnedLines.value.map((l) => ({
+      deliveryId: l.deliveryId,
       product: l.product,
       description: l.description,
       unit: l.unit,
@@ -670,6 +839,7 @@ function buildInput(): SalesTransactionInput {
 
 function resetForm() {
   form.linkedInvoiceId = null;
+  form.deliveryIds = [];
   form.customerName = "";
   form.customerAddress = "";
   form.shippingAddress = "";
@@ -767,6 +937,9 @@ const wrapCellClass = css({ whiteSpace: "normal!", wordBreak: "break-word", text
 const numCellClass = css({ textAlign: "right" });
 const numInputClass = css({ textAlign: "right" });
 const emptyCellClass = css({ textAlign: "center", py: "6!" });
+// The delivery a run of rows came back on. Tinted rather than bold-on-white so
+// it reads as a divider between groups, not as another line item.
+const groupHeaderClass = css({ bg: "gray.25", py: "2!" });
 const lineErrorClass = css({ mt: 2 });
 
 const bottomRowClass = css({

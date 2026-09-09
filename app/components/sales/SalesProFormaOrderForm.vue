@@ -220,6 +220,19 @@
           <MpFormLabel>Memo</MpFormLabel>
           <MpTextarea v-model="form.memo" placeholder="Memo" is-full-width />
         </MpFormControl>
+        <MpFormControl>
+          <MpFormLabel>Attachments</MpFormLabel>
+          <MpUpload
+            placeholder="or drag & drop file here"
+            accept=".xlsx,.xls,.doc,.docx,.pdf,.jpg,.jpeg,.png,.zip"
+            is-multiple
+            is-full-width
+            @change="onAttachmentChange"
+          />
+          <MpFormHelpText>
+            Files can be Excel, Word, PDF, JPG, PNG, or ZIP (maximum 5 files and 10 MB per file).
+          </MpFormHelpText>
+        </MpFormControl>
       </div>
 
       <div :class="totalsColClass">
@@ -297,7 +310,8 @@ import {
   MpTableRow,
   MpTag,
   MpText,
-  MpTextarea
+  MpTextarea,
+  MpUpload
 } from "@mekari/pixel3";
 import DefaultPageContent from "~/components/template/DefaultPageContent.vue";
 import {
@@ -380,6 +394,7 @@ const form = reactive({
   message: "",
   memo: ""
 });
+const attachments = ref<string[]>([]);
 const submitted = ref(false);
 
 const linkedOrder = computed(() =>
@@ -447,6 +462,7 @@ function loadFromExisting() {
   form.tags = [...r.tags];
   form.message = r.message;
   form.memo = r.memo;
+  attachments.value = [...r.attachments];
 }
 watch(existing, loadFromExisting, { immediate: true });
 
@@ -498,6 +514,12 @@ const missingFields = computed(() => {
   return missing;
 });
 
+function onAttachmentChange(event: Event) {
+  const files = (event.target as HTMLInputElement)?.files;
+  // Names only — this prototype never uploads or stores the bytes.
+  attachments.value = files ? [...files].map((f) => f.name) : [];
+}
+
 function buildInput(): SalesTransactionInput {
   return {
     ...emptyTransactionInput(),
@@ -515,6 +537,7 @@ function buildInput(): SalesTransactionInput {
     tags: form.tags,
     message: form.message,
     memo: form.memo,
+    attachments: attachments.value,
     lines: billedLines.value
   };
 }

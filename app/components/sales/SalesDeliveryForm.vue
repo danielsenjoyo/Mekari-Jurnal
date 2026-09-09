@@ -237,6 +237,19 @@
           <MpFormLabel>Memo</MpFormLabel>
           <MpTextarea v-model="form.memo" placeholder="Memo" is-full-width />
         </MpFormControl>
+        <MpFormControl>
+          <MpFormLabel>Attachments</MpFormLabel>
+          <MpUpload
+            placeholder="or drag & drop file here"
+            accept=".xlsx,.xls,.doc,.docx,.pdf,.jpg,.jpeg,.png,.zip"
+            is-multiple
+            is-full-width
+            @change="onAttachmentChange"
+          />
+          <MpFormHelpText>
+            Files can be Excel, Word, PDF, JPG, PNG, or ZIP (maximum 5 files and 10 MB per file).
+          </MpFormHelpText>
+        </MpFormControl>
       </div>
 
       <div :class="totalsColClass">
@@ -317,7 +330,8 @@ import {
   MpTableRow,
   MpTag,
   MpText,
-  MpTextarea
+  MpTextarea,
+  MpUpload
 } from "@mekari/pixel3";
 import DefaultPageContent from "~/components/template/DefaultPageContent.vue";
 import {
@@ -403,6 +417,7 @@ const emailText = ref("");
 const shippingFee = ref(0);
 const shippingFeeText = ref("");
 const sourceOrderId = ref<number | null>(null);
+const attachments = ref<string[]>([]);
 const submitted = ref(false);
 
 const GENERIC_UNITS = ["pcs", "pack", "set", "roll", "box", "Gram", "ml"];
@@ -468,6 +483,7 @@ function loadFromExisting() {
   form.tags = [...r.tags];
   form.message = r.message;
   form.memo = r.memo;
+  attachments.value = [...r.attachments];
   form.lines = r.lines.map((l) => ({
     key: ++lineKeySeq,
     product: l.product,
@@ -551,6 +567,12 @@ const missingFields = computed(() => {
   return missing;
 });
 
+function onAttachmentChange(event: Event) {
+  const files = (event.target as HTMLInputElement)?.files;
+  // Names only — this prototype never uploads or stores the bytes.
+  attachments.value = files ? [...files].map((f) => f.name) : [];
+}
+
 function buildInput(): SalesTransactionInput {
   return {
     ...emptyTransactionInput(),
@@ -576,6 +598,7 @@ function buildInput(): SalesTransactionInput {
     tags: form.tags,
     message: form.message,
     memo: form.memo,
+    attachments: attachments.value,
     lines: form.lines
       .filter((l) => l.product && l.quantity > 0)
       .map((l) => ({

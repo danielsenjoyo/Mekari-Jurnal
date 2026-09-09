@@ -57,6 +57,10 @@ function numberForTransaction(type: TransactionType, id: number): string {
 
 export interface SalesTransactionLine {
   id: number;
+  /** Return-only: the delivery this line came back on, when the return was
+   *  raised against deliveries rather than the invoice as a whole. Lets the
+   *  detail page group a saved return the same way its form did. */
+  deliveryId?: number | null;
   product: string;
   description: string;
   unit: string;
@@ -188,6 +192,13 @@ export interface SalesTransaction {
   // invoices' figures, not independently generated: there is nothing to bill
   // beyond what the linked invoices already owe.
   joinedInvoiceIds: number[];
+  // The deliveries this document is tied to. On an INVOICE these are the
+  // deliveries it bills for; on a RETURN they are the deliveries whose goods
+  // are physically coming back — the source app lets you raise a return
+  // against specific deliveries rather than the invoice as a whole, and then
+  // groups the returned lines under them. Empty means "the invoice as a
+  // whole", which is the simpler and more common case.
+  deliveryIds: number[];
   // Pro-forma-order-only (null elsewhere): the Sales Order this pro forma
   // bills against. Progress billing invoices a *share* of an order over time,
   // so the order is the thing being drawn down.
@@ -472,6 +483,7 @@ function buildTransaction(type: TransactionType, i: number, seq: number): SalesT
     linkedDeliveryId: null,
     linkedInvoiceId: null,
     joinedInvoiceIds: [],
+    deliveryIds: [],
     linkedOrderId: null,
     billingMethod: type === "proforma_order" ? BILLING_METHODS[i % BILLING_METHODS.length]! : null,
     // A pro forma order bills a share of its order — a quarter, a third, half.
@@ -545,6 +557,45 @@ function linkReturnsToInvoices(all: SalesTransaction[]): void {
       ret.shippingAddress = invoice.customerAddress;
       ret.shippingDate = ret.transactionDate;
       ret.shippingDateSort = ret.transactionDateSort;
+      // When the invoice shipped against deliveries, half the returns are
+      // raised against those deliveries rather than the invoice as a whole —
+      // the source app supports both, so the dataset has to show both. Each
+      // line then remembers which delivery it came back on, which is what the
+      // form and the detail page group by.
+      if (invoice.deliveryIds.length && i % 2 === 0) {
+        const deliveryId = invoice.deliveryIds[0]!;
+        // Resolved from `all`, NEVER through getSalesTransactionById: the
+        // linking passes run inside buildDataset(), before `cache` is
+        // assigned, so any public lookup here would re-enter buildDataset()
+        // and recurse until the stack blows.
+        const delivery = all.find((t) => t.id === deliveryId);
+        const shipped = new Map<string, number>();
+        for (const line of delivery?.lines ?? []) {
+          shipped.set(line.product, (shipped.get(line.product) ?? 0) + line.quantity);
+        }
+        const fromDelivery = ret.lines.filter((l) => (shipped.get(l.product) ?? 0) > 0);
+        if (fromDelivery.length) {
+          ret.deliveryIds = [deliveryId];
+          ret.lines = fromDelivery.map((l) => ({
+            ...l,
+            deliveryId,
+            // Never more than that delivery actually carried.
+            quantity: Math.min(l.quantity, shipped.get(l.product) ?? 0)
+          }));
+          ret.subtotal = ret.lines.reduce(
+            (sum, l) => sum + lineAmount(l.quantity, l.unitPrice, l.discountPercent),
+            0
+          );
+          ret.lines = ret.lines.map((l) => ({
+            ...l,
+            amount: lineAmount(l.quantity, l.unitPrice, l.discountPercent)
+          }));
+          ret.taxAmount = Math.round(ret.subtotal * TAX_RATE);
+          ret.taxes = ret.taxAmount > 0 ? [{ label: "PPN 11%", amount: ret.taxAmount }] : [];
+          ret.total = ret.subtotal + ret.taxAmount;
+          ret.balanceDue = ret.total;
+        }
+      }
     });
 }
 
@@ -608,6 +659,29 @@ function linkProFormaOrdersToOrders(all: SalesTransaction[]): void {
     });
 }
 
+// Ties roughly half the invoices to the deliveries that shipped their goods,
+// matched on customer so the chain reads true (an invoice never bills for
+// someone else's delivery). Runs as a pass over the finished array because the
+// deliveries have to exist first — same reason as linkOrdersToDeliveries.
+//
+// This is what makes a delivery-sourced return possible: without it, a return
+// has only the invoice to work from.
+function linkInvoicesToDeliveries(all: SalesTransaction[]): void {
+  const deliveries = all.filter((t) => t.type === "delivery");
+  if (!deliveries.length) return;
+  all
+    .filter((t) => t.type === "invoice")
+    .forEach((invoice, i) => {
+      if (i % 2 === 1) return; // only about half of them ship against a delivery
+      const sameCustomer = deliveries.filter((d) => d.customerName === invoice.customerName);
+      const pool = sameCustomer.length ? sameCustomer : deliveries;
+      // One or two deliveries per invoice — a part shipment is as real as a
+      // single one, and the return form has to cope with both.
+      const count = 1 + (i % 2 === 0 && pool.length > 1 ? i % 2 : 0);
+      invoice.deliveryIds = pool.slice(0, count).map((d) => d.id);
+    });
+}
+
 function buildDataset(): SalesTransaction[] {
   const all: SalesTransaction[] = [];
   let seq = 1;
@@ -618,6 +692,9 @@ function buildDataset(): SalesTransaction[] {
     }
   }
   linkOrdersToDeliveries(all);
+  // Before linkReturnsToInvoices: a return can only cite a delivery its own
+  // invoice actually shipped on, so that link has to exist first.
+  linkInvoicesToDeliveries(all);
   linkReturnsToInvoices(all);
   linkJoinInvoicesToInvoices(all);
   linkProFormaOrdersToOrders(all);
@@ -708,7 +785,8 @@ export function duplicateTransaction(id: number): SalesTransaction | undefined {
     // A duplicate is a fresh, unfulfilled draft — it doesn't inherit the
     // source order's delivery link or the source return's invoice link.
     linkedDeliveryId: null,
-    linkedInvoiceId: null
+    linkedInvoiceId: null,
+    deliveryIds: []
   };
 
   transactions.unshift(duplicate);
@@ -753,6 +831,8 @@ export function applyCreditMemo(
 // ---------------------------------------------------------------------------
 
 export interface SalesTransactionLineInput {
+  /** Return-only — see SalesTransactionLine.deliveryId. */
+  deliveryId?: number | null;
   product: string;
   description: string;
   unit: string;
@@ -797,6 +877,8 @@ export interface SalesTransactionInput {
   linkedInvoiceId: number | null;
   // Join-invoice-only: the invoice records this one bundles.
   joinedInvoiceIds: number[];
+  /** Return-only: the deliveries the returned goods came back on. */
+  deliveryIds: number[];
   // Pro-forma-order-only: the order this bills against, and the share it takes.
   linkedOrderId: number | null;
   billingMethod: BillingMethod | null;
@@ -915,6 +997,7 @@ export function computeLineAmount(
 function toLines(lines: SalesTransactionLineInput[]): SalesTransactionLine[] {
   return lines.map((l, i) => ({
     id: i + 1,
+    deliveryId: l.deliveryId ?? null,
     product: l.product,
     description: l.description,
     // Fall back to the product's canonical unit when the form left it blank.
@@ -1113,6 +1196,7 @@ export function emptyTransactionInput(): SalesTransactionInput {
     lines: [],
     linkedInvoiceId: null,
     joinedInvoiceIds: [],
+    deliveryIds: [],
     linkedOrderId: null,
     billingMethod: null,
     billingPercent: 0
@@ -1135,6 +1219,32 @@ export function getReturnsForInvoice(invoiceId: number): SalesTransaction[] {
   return getSalesTransactions().filter(
     (t) => t.type === "return" && t.linkedInvoiceId === invoiceId
   );
+}
+
+/** The deliveries an invoice bills for — the choices a return can be raised
+ *  against. Empty when the invoice was never tied to one, in which case the
+ *  return is simply made against the invoice as a whole. */
+export function deliveriesForInvoice(invoiceId: number): SalesTransaction[] {
+  const invoice = getSalesTransactionById(invoiceId);
+  if (!invoice) return [];
+  return invoice.deliveryIds
+    .map((id) => getSalesTransactionById(id))
+    .filter((t): t is SalesTransaction => t?.type === "delivery");
+}
+
+/** How much of each product a given set of deliveries actually shipped. A
+ *  return raised against them can never send back more than they carried,
+ *  whatever the invoice says. */
+export function deliveredQuantities(deliveryIds: number[]): Map<string, number> {
+  const shipped = new Map<string, number>();
+  for (const id of deliveryIds) {
+    const delivery = getSalesTransactionById(id);
+    if (delivery?.type !== "delivery") continue;
+    for (const line of delivery.lines) {
+      shipped.set(line.product, (shipped.get(line.product) ?? 0) + line.quantity);
+    }
+  }
+  return shipped;
 }
 
 /** How much of each invoice line is still returnable: the invoiced quantity
@@ -1226,6 +1336,7 @@ export function createTransaction(
     linkedDeliveryId: null,
     linkedInvoiceId: type === "return" ? input.linkedInvoiceId : null,
     joinedInvoiceIds: cap.bundlesInvoices ? input.joinedInvoiceIds : [],
+    deliveryIds: type === "return" ? input.deliveryIds : [],
     linkedOrderId: cap.progressBilling ? input.linkedOrderId : null,
     billingMethod: cap.progressBilling ? input.billingMethod : null,
     billingPercent: cap.progressBilling ? input.billingPercent : 0
@@ -1357,6 +1468,7 @@ export function updateTransaction(
     depositAmount: cap.deposit ? totals.deposit : 0,
     attachments: input.attachments,
     joinedInvoiceIds: cap.bundlesInvoices ? input.joinedInvoiceIds : record.joinedInvoiceIds,
+    deliveryIds: record.type === "return" ? input.deliveryIds : record.deliveryIds,
     linkedOrderId: cap.progressBilling ? input.linkedOrderId : record.linkedOrderId,
     billingMethod: cap.progressBilling ? input.billingMethod : record.billingMethod,
     billingPercent: cap.progressBilling ? input.billingPercent : record.billingPercent,

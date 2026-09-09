@@ -422,11 +422,13 @@
               <MpInputGroup>
                 <MpInputLeftAddon>
                   <MpPopover use-portal is-adaptive-width>
+                    <!-- Pixel's documented dropdown trigger: ghost variant +
+                         chevron, never a raw HTML control. Picking the discount
+                         unit is a menu, and MpButton is what a menu trigger is
+                         (docs.mekari.design/components/button.html). The comment
+                         sits OUTSIDE MpPopoverTrigger on purpose — Vue counts a
+                         comment as a node, and the trigger accepts exactly one. -->
                     <MpPopoverTrigger>
-                      <!-- Pixel's documented dropdown trigger: ghost variant
-                           + chevron, never a raw HTML control. Picking the
-                           discount unit is a menu, and MpButton is what a menu
-                           trigger is (docs.mekari.design/components/button.html). -->
                       <MpButton variant="ghost" size="sm" right-icon="chevrons-down">
                         {{ discountType === "percent" ? "%" : "Rp" }}
                       </MpButton>

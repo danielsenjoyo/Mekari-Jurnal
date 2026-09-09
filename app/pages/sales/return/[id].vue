@@ -145,6 +145,22 @@
               linkedInvoice ? formatDisplayDate(linkedInvoice.transactionDateSort) : "—"
             }}</MpText>
           </div>
+          <!-- Only shown when the return was raised against specific
+               deliveries; one made against the whole invoice has none. -->
+          <div v-if="sourceDeliveries.length" :class="metaFieldClass">
+            <MpText color="gray.600">Delivery no.</MpText>
+            <MpFlex gap="2" flex-wrap="wrap">
+              <MpTextlink
+                v-for="delivery in sourceDeliveries"
+                :key="delivery.id"
+                as="button"
+                variant="primary"
+                :class="textlinkCellClass"
+                @click="navigateTo(`/sales/delivery/${delivery.id}`)"
+                >{{ delivery.number }}</MpTextlink
+              >
+            </MpFlex>
+          </div>
           <div v-if="record.warehouse" :class="metaFieldClass">
             <MpText color="gray.600">Warehouse</MpText>
             <MpTextlink
@@ -191,7 +207,13 @@
             </MpTableRow>
           </MpTableHead>
           <MpTableBody>
-            <MpTableRow v-for="line in record.lines" :key="line.id">
+            <template v-for="group in lineGroups" :key="group.key">
+              <MpTableRow v-if="group.label">
+                <MpTableCell as="td" :colspan="7" :class="groupHeaderClass">
+                  <MpText size="label" weight="semiBold" color="dark">{{ group.label }}</MpText>
+                </MpTableCell>
+              </MpTableRow>
+              <MpTableRow v-for="line in group.lines" :key="line.id">
               <MpTableCell as="td">
                 <MpTextlink
                   as="button"
@@ -213,7 +235,8 @@
               <MpTableCell as="td" :class="numCellClass">{{
                 formatCurrency(line.amount)
               }}</MpTableCell>
-            </MpTableRow>
+              </MpTableRow>
+            </template>
           </MpTableBody>
         </MpTable>
       </MpTableContainer>
@@ -393,7 +416,8 @@ import {
   formatDisplayDate,
   getAdjacentTransactionIds,
   getSalesTransactionById,
-  getTransactionOfType
+  getTransactionOfType,
+  type SalesTransaction
 } from "~/data/sales-transactions";
 
 // ---------------------------------------------------------------------------
@@ -415,6 +439,31 @@ const linkedInvoice = computed(() =>
     : undefined
 );
 const adjacent = computed(() => getAdjacentTransactionIds(id.value));
+
+/** The deliveries this return was raised against, when it was raised against
+ *  deliveries at all rather than the invoice as a whole. */
+const sourceDeliveries = computed<SalesTransaction[]>(() =>
+  (record.value?.deliveryIds ?? [])
+    .map((deliveryId) => getSalesTransactionById(deliveryId))
+    .filter((t): t is SalesTransaction => Boolean(t))
+);
+
+/** Saved lines, split by the delivery they came back on — the same grouping
+ *  the form showed while the return was being written. */
+const lineGroups = computed(() => {
+  const lines = record.value?.lines ?? [];
+  if (!sourceDeliveries.value.length) {
+    return [{ key: "invoice", label: "", lines }];
+  }
+  return sourceDeliveries.value
+    .map((delivery) => ({
+      key: String(delivery.id),
+      // Already reads "Sales Delivery #24042" — see the same note on the form.
+      label: delivery.number,
+      lines: lines.filter((l) => l.deliveryId === delivery.id)
+    }))
+    .filter((group) => group.lines.length > 0);
+});
 
 useHead({
   title: computed(() =>
@@ -495,6 +544,9 @@ const lineCaptionClass = css({ mt: 3, mb: 3 });
 const wrapCellClass = css({ whiteSpace: "normal!", wordBreak: "break-word", textAlign: "left" });
 // On an inline child inside a cell (MpTag / MpTextlink) that ships its own
 // nowrap — these are not the cell, so an inline-block box is correct here.
+// The delivery a run of rows came back on — tinted rather than bold-on-white
+// so it reads as a divider between groups, not as another line item.
+const groupHeaderClass = css({ bg: "gray.25", py: "2!" });
 const wrapInlineClass = css({
   whiteSpace: "normal!",
   wordBreak: "break-word",
