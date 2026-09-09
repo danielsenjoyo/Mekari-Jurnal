@@ -285,6 +285,9 @@
                   <MpPopoverListItem role="menuitem" @click="onAction('create-invoice')"
                     >Create invoice</MpPopoverListItem
                   >
+                  <MpPopoverListItem role="menuitem" @click="onAction('create-proforma')"
+                    >Create pro forma invoice</MpPopoverListItem
+                  >
                   <MpPopoverListItem role="menuitem" @click="onAction('duplicate')"
                     >Duplicate transaction</MpPopoverListItem
                   >
@@ -402,6 +405,10 @@ function onAction(action: string) {
   }
   if (action === "create-invoice") {
     navigateTo("/sales/invoice/new");
+    return;
+  }
+  if (action === "create-proforma") {
+    navigateTo("/sales/proforma-invoice/new");
     return;
   }
   void action; // wire the rest to the relevant modal/API call on a real screen

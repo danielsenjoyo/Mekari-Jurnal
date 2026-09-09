@@ -345,6 +345,12 @@
                   <MpPopoverListItem role="menuitem" @click="onAction('create-invoice')"
                     >Create invoice</MpPopoverListItem
                   >
+                  <MpPopoverListItem role="menuitem" @click="onAction('create-proforma')"
+                    >Create pro forma invoice</MpPopoverListItem
+                  >
+                  <MpPopoverListItem role="menuitem" @click="onAction('create-proforma-order')"
+                    >Create pro forma order</MpPopoverListItem
+                  >
                   <MpPopoverListItem
                     v-if="order.status !== 'closed'"
                     role="menuitem"
@@ -557,6 +563,16 @@ function onAction(action: string) {
   }
   if (action === "create-invoice") {
     navigateTo("/sales/invoice/new");
+    return;
+  }
+  if (action === "create-proforma") {
+    navigateTo("/sales/proforma-invoice/new");
+    return;
+  }
+  if (action === "create-proforma-order") {
+    // Progress billing draws a share of THIS order, so the id rides in the
+    // query for the form to seed its customer, lines and remaining share.
+    navigateTo(`/sales/proforma-order/new?order=${order.value?.id}`);
     return;
   }
   void action; // wire the rest to the relevant modal/API call/detail page on a real screen

@@ -109,6 +109,16 @@
     <!-- Zone C — filter bar. -->
     <div :class="filterBarClass">
       <div :class="filterLeftClass">
+        <!-- The invoice allowance (FUP), shown where invoices are actually
+             created. Links to the history page that accounts for it. -->
+        <MpFlex v-if="activeTabKey === 'si'" align-items="center" gap="2">
+          <MpText size="body-small" color="gray.600"
+            >Invoice quota {{ quota.used }}/{{ quota.total }}</MpText
+          >
+          <MpTextlink as="button" variant="primary" @click="navigateTo('/sales/quota-history')"
+            >Usage history</MpTextlink
+          >
+        </MpFlex>
         <div v-if="statusOptions.length" :class="quickFilterClass">
           <MpSelect v-model="quickStatus" placeholder="All status" is-full-width is-clearable>
             <option value="">All status</option>
@@ -210,6 +220,32 @@
           <div :class="modalFooterClass">
             <MpButton variant="secondary" @click="closeDeleteModal">Cancel</MpButton>
             <MpButton variant="danger" @click="confirmDelete">Delete</MpButton>
+          </div>
+        </MpModalFooter>
+      </MpModalContent>
+    </MpModal>
+
+    <!-- Out of invoice quota. Not a confirm — there is nothing to confirm; it
+         explains why the action stopped and offers the two ways forward. -->
+    <MpModal :is-open="isQuotaModalOpen" size="sm" @close="isQuotaModalOpen = false">
+      <MpModalOverlay />
+      <MpModalContent>
+        <MpModalHeader>
+          <span :class="modalTitleClass">Invoice quota reached</span>
+          <MpModalCloseButton />
+        </MpModalHeader>
+        <MpModalBody>
+          <MpText size="body" color="gray.700">
+            All {{ quota.total }} sales invoices in this month's quota have been used. Add more
+            quota to keep invoicing, or wait for the reset on the 10th.
+          </MpText>
+        </MpModalBody>
+        <MpModalFooter>
+          <div :class="modalFooterClass">
+            <MpButton variant="secondary" @click="isQuotaModalOpen = false">Cancel</MpButton>
+            <MpButton variant="primary" @click="navigateTo('/sales/quota-history')"
+              >Add quota</MpButton
+            >
           </div>
         </MpModalFooter>
       </MpModalContent>
@@ -354,11 +390,48 @@
                   ><span :class="wrapCellClass">{{ cellText(row, col.key) }}</span></template
                 >
               </MpTableCell>
-              <!-- Filler cell. On the approval queue it holds the row's two
-                   indicators — approval progress and comment count — which is
-                   where the reference puts them. -->
+              <!-- Filler cell, doing double duty. On the approval queue it
+                   holds the row's two indicators; everywhere else it holds the
+                   row's own actions menu — the source page's `action`/`share`
+                   columns, which sit at the same right edge. -->
               <MpTableCell as="td" :class="indicatorCellClass">
-                <MpFlex v-if="activeTabKey === 'ap'" gap="3" justify-content="flex-end">
+                <MpFlex v-if="activeTabKey !== 'ap'" justify-content="flex-end">
+                  <MpPopover placement="bottom-end" use-portal is-adaptive-width>
+                    <template #default>
+                      <MpPopoverTrigger>
+                        <MpButton
+                          variant="ghost"
+                          size="sm"
+                          left-icon="menu-kebab"
+                          aria-label="Row actions"
+                        />
+                      </MpPopoverTrigger>
+                      <MpPopoverContent>
+                        <MpPopoverList>
+                          <MpPopoverListItem role="menuitem" @click="onOpen(row)"
+                            >View detail</MpPopoverListItem
+                          >
+                          <MpPopoverListItem role="menuitem" @click="onRowEdit(row)"
+                            >Edit</MpPopoverListItem
+                          >
+                          <MpPopoverListItem role="menuitem" @click="onRowDuplicate(row)"
+                            >Duplicate transaction</MpPopoverListItem
+                          >
+                          <MpPopoverListItem role="menuitem" @click="onAction('print')"
+                            >Preview &amp; print</MpPopoverListItem
+                          >
+                          <MpPopoverListItem role="menuitem" @click="onAction('share-email')"
+                            >Share via email</MpPopoverListItem
+                          >
+                          <MpPopoverListItem role="menuitem" @click="openDeleteModal([row.id])"
+                            >Delete</MpPopoverListItem
+                          >
+                        </MpPopoverList>
+                      </MpPopoverContent>
+                    </template>
+                  </MpPopover>
+                </MpFlex>
+                <MpFlex v-else gap="3" justify-content="flex-end">
                   <!-- Approval progress. The reference opens an approval log
                        from here; this prototype has no log to open, so the
                        decision itself lives in the popover instead — the row
@@ -535,11 +608,13 @@ import {
   type SalesFilter
 } from "~/data/sales-filter";
 import { SALES_STATUS_LABEL, SALES_STATUS_TYPE, type SalesStatus } from "~/data/sales-status";
+import { getQuotaSummary } from "~/data/sales-quota";
 import {
   BILLING_METHOD_LABEL,
   MEKARI_PAY_METHOD,
   TYPE_CAPABILITIES,
   decideApproval,
+  duplicateTransaction,
   formatAmount,
   formatCurrency,
   deleteTransactions,
@@ -867,11 +942,17 @@ const sortKey = ref<ColumnKey | null>(null);
 const sortDir = ref<"asc" | "desc">("asc");
 const isLoading = ref(false);
 const showDeleteModal = ref(false);
+const isQuotaModalOpen = ref(false);
 const pendingDeleteIds = ref<number[]>([]);
 // The shared dataset (app/data/sales-transactions.ts) is a plain
 // (non-reactive) array — bumping this after a mutation (delete) is what makes
 // filteredRows/summary re-read it.
 const refreshTick = ref(0);
+
+const quota = computed(() => {
+  void refreshTick.value;
+  return getQuotaSummary();
+});
 
 const searchTerm = computed(() => (search.value ?? "").trim());
 
@@ -1101,7 +1182,25 @@ function onApproval(row: Row, decision: "approve" | "reject") {
   refreshTick.value++;
 }
 
+// Row actions route by the ROW's type, not the tab's: the Rejected queue mixes
+// every type, so a row there still has to reach its own edit form.
+function onRowEdit(row: Row) {
+  const route = TYPE_CAPABILITIES[row.type]?.route;
+  if (route) navigateTo(`/sales/${route}/edit/${row.id}`);
+}
+function onRowDuplicate(row: Row) {
+  const duplicate = duplicateTransaction(row.id);
+  const route = duplicate && TYPE_CAPABILITIES[duplicate.type]?.route;
+  if (route) navigateTo(`/sales/${route}/edit/${duplicate!.id}`);
+}
+
 function onNewTransaction(key: string) {
+  // An exhausted allowance stops an invoice here rather than letting the form
+  // be filled in and fail on save — the source page gates the same action.
+  if (key === "invoice" && quota.value.remaining <= 0) {
+    isQuotaModalOpen.value = true;
+    return;
+  }
   const route = TYPE_CAPABILITIES[key as TransactionType]?.route;
   if (route) navigateTo(`/sales/${route}/new`);
 }
