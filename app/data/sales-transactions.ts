@@ -413,6 +413,13 @@ function buildTransaction(type: TransactionType, i: number, seq: number): SalesT
 
   const lines = buildLines(seq);
   const subtotal = lines.reduce((sum, l) => sum + l.amount, 0);
+  // What the per-line discounts took off. `line.amount` is already net of
+  // them, so this is the gap between list value and what was charged — the
+  // figure `discountPerLines` is defined as, and the one the reports' Gross
+  // Amount and Discount Amount columns are derived from. It was hardcoded to
+  // 0 while buildLines() was handing out 10% discounts, which left Discount
+  // Amount reading 0,00 on every row of a report that offers the column.
+  const discountPerLines = lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0) - subtotal;
   const taxAmount = Math.round(subtotal * TAX_RATE);
   const total = subtotal + taxAmount;
 
@@ -479,9 +486,10 @@ function buildTransaction(type: TransactionType, i: number, seq: number): SalesT
     currency: "IDR",
     priceIncludesTax: false,
     subtotal,
-    // Generated records have no transaction-level discount or withholding —
-    // those only arrive from the create/edit form.
-    discountPerLines: 0,
+    // Generated records have no transaction-*level* discount or withholding —
+    // those only arrive from the create/edit form. The per-line discounts
+    // above are real, though.
+    discountPerLines,
     discountType: "percent" as DiscountType,
     discountValue: 0,
     discountAmount: 0,
@@ -647,8 +655,22 @@ function linkJoinInvoicesToInvoices(all: SalesTransaction[]): void {
       joinInvoice.taxAmount = 0;
       joinInvoice.taxes = [];
       joinInvoice.balanceDue = linked.reduce((sum, inv) => sum + inv.balanceDue, 0);
-      joinInvoice.amountReceived = 0;
+      joinInvoice.amountReceived = joinInvoice.total - joinInvoice.balanceDue;
       joinInvoice.payments = [];
+      // The figures above are the linked invoices' — so the status has to be
+      // too. It was left on whatever the generator's pool handed out, which
+      // produced "Paid" join invoices still showing their full balance due the
+      // moment a report put the two columns side by side. A record that is
+      // rejected or awaiting approval keeps that status: those describe where
+      // the document is in the approval flow, not what is owed on it.
+      if (joinInvoice.status !== "rejected" && !joinInvoice.needsApproval) {
+        joinInvoice.status =
+          joinInvoice.balanceDue === 0
+            ? "paid"
+            : joinInvoice.amountReceived > 0
+              ? "partial"
+              : "open";
+      }
     });
 }
 

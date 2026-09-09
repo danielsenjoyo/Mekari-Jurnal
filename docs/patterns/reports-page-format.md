@@ -3,7 +3,7 @@
 > A **report** screen: pick a date range and criteria, press a button, read a
 > table with a TOTAL row. Looks like an index page and isn't one.
 > Reference impl: [`app/pages/reports/purchases_list.vue`](../../app/pages/reports/purchases_list.vue)
-> — the other ten reports (four Purchases, six Sales) are the same five
+> — the other twelve reports (four Purchases, eight Sales) are the same five
 > components with different columns.
 > Shared chrome: [`ReportFilterBar`](../../app/components/reports/ReportFilterBar.vue),
 > [`ReportTable`](../../app/components/reports/ReportTable.vue),
@@ -65,11 +65,11 @@ through to the default.
 | Purchase by product       | one **product**, aggregated         | Filter applies per transaction, not per row     |
 | Purchase order completion | one order                           | Links order → its delivery                      |
 
-## The six Sales reports
+## The eight Sales reports
 
 The first five are the AR mirror of the table above, one for one — same five
-shapes, same five components, `vendorName` → `customerName`. Product
-profitability has no AP counterpart:
+shapes, same five components, `vendorName` → `customerName`. The last three
+have no AP counterpart:
 
 | Report                 | Rows are                            | Notable                                                        |
 | ---------------------- | ----------------------------------- | -------------------------------------------------------------- |
@@ -79,6 +79,31 @@ profitability has no AP counterpart:
 | Sales by product       | one **product**, aggregated         | Filter applies per transaction, not per row                    |
 | Sales order completion | one order                           | Links order → its delivery                                     |
 | Product profitability  | one **product** sold, aggregated    | **Reads both ledgers** — sales for revenue, purchases for cost |
+| Pro forma invoice list | one pro forma invoice               | The Sales list pinned to one type, minus Deposit               |
+| Join invoice list      | one join invoice                    | Nine columns, not sixteen — see below                          |
+
+### Two of them were built, not ported
+
+Pro forma invoice list and Join invoice list have **no Vue page in
+`jurnal-frontend-app`** — like Customer balance and Aged receivable, production
+still renders them server-side. What their cards on the Reports index promise
+("Shows all created proforma invoices in a certain period") is the Sales list
+pinned to one transaction type, so that is what they are: same composable, same
+drawer, `defaults: { transactionType }` and a column set of their own.
+
+**Their column sets are trimmed to what the document actually carries**, which
+is the whole reason they aren't literally `sales_list`. A join invoice has no
+lines of its own — the generator sets its figures from the invoices it bundles
+— so `taxAmount`, `amountReceived` and both discount fields stay at zero and
+`subtotal` equals `total`. Offering the Sales list's sixteen columns would mean
+six guaranteed `0,00`s and one duplicate of Total. It ships nine, including
+**Invoices Bundled**, which is the only column that says anything the Sales
+list couldn't.
+
+When you pin a report to a type, walk `TYPE_CAPABILITIES` and the generator for
+that type before choosing columns. The rule from § Gotchas scales: a column that
+can never say anything is worse than no column, and a page of them is worse
+still.
 
 Two things are genuinely Sales', not a find-and-replace:
 
@@ -134,6 +159,26 @@ per-product markup of roughly 20–45%.
 Equal prices make the report meaningless; one flat markup makes every row rank
 the same, which is worse than it sounds for a report whose job is to say what to
 sell more of.
+
+### A report is a consistency check on its own fixture
+
+Putting a module's records in a table with a TOTAL row surfaces things no
+detail page does. Two defects in the Sales fixture were found this way, both
+pre-dating the reports:
+
+- **`discountPerLines` was hardcoded to `0`** while `buildLines()` was handing
+  out 10% line discounts, so Gross Amount equalled the subtotal and Discount
+  Amount read `0,00` on every row of a layout that offers the column. It is now
+  the real gap between list value and what was charged.
+- **A join invoice's status was independent of its balance**, because the
+  linking pass overwrites the figures but left the generator's status alone —
+  so the Join invoice list showed `Paid` rows carrying their full balance due.
+  Status is now derived from the linked balance, except for `rejected` and
+  awaiting-approval records, whose status describes where the document sits in
+  the approval flow rather than what is owed on it.
+
+Both were invisible until two columns sat next to each other. **When a new
+report's numbers look wrong, suspect the fixture before the projection.**
 
 ## What is shared and what is mirrored
 

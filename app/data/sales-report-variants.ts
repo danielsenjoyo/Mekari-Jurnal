@@ -22,6 +22,12 @@
 
 import type { ReportColumn } from "./report-column";
 import { getPurchaseTransactions } from "./purchase-transactions";
+import {
+  buildSalesReportRows,
+  reportColumn,
+  type SalesReportColumn,
+  type SalesReportRow
+} from "./sales-report";
 import { SALES_STATUS_LABEL, type SalesStatus } from "./sales-status";
 import {
   PRODUCT_OPTIONS,
@@ -376,6 +382,85 @@ export function buildProductReportRows(
       totalSalesValue: row.salesValue - row.returnValue
     }))
     .sort((a, b) => a.productName.localeCompare(b.productName));
+}
+
+// ---------------------------------------------------------------------------
+// Pro forma invoice list / Join invoice list
+//
+// Both are the Sales list report pinned to one transaction type — which is
+// what their cards on the Reports index promise ("Shows all created proforma
+// invoices in a certain period"). Neither has a Vue page in
+// `jurnal-frontend-app` to port: like Customer balance and Aged receivable,
+// production still renders them server-side. So these are built to
+// `docs/patterns/reports-page-format.md` rather than cloned, and their column
+// sets are trimmed to what each document actually carries.
+// ---------------------------------------------------------------------------
+
+/**
+ * Pro forma invoices carry everything an invoice does except a deposit and a
+ * credit memo (see `TYPE_CAPABILITIES`), so the column set is the Sales list's
+ * minus Deposit. Payment and Balance Due stay: a pro forma's status pool
+ * includes `paid`, so both columns have something to say.
+ */
+export const PROFORMA_INVOICE_COLUMNS: SalesReportColumn[] = [
+  "date",
+  "number",
+  "customerName",
+  "referenceNo",
+  "dueDate",
+  "status",
+  "tags",
+  "warehouse",
+  "grossAmount",
+  "discountAmount",
+  "taxAmount",
+  "total",
+  "payment",
+  "balanceDue"
+].map((key) => reportColumn(key as keyof SalesReportRow));
+
+/** A join invoice, plus the one figure that makes it one. */
+export interface JoinInvoiceRow extends SalesReportRow {
+  /** How many invoices this document bundles. */
+  invoiceCount: number;
+}
+
+/**
+ * Deliberately shorter than the Sales list's. A join invoice has no lines of
+ * its own — its figures are the sum of the invoices it bundles — so the
+ * generator leaves `taxAmount`, `amountReceived` and both discount fields at
+ * zero, and `subtotal` equal to `total`. Six columns of guaranteed `0,00` and
+ * one duplicate of Total are worse than not offering them (see
+ * `reports-page-format.md` § Gotchas), so what is left is the document, its
+ * customer, what it bundles, and what is still owed on it.
+ */
+export const JOIN_INVOICE_COLUMNS: ReportColumn<keyof JoinInvoiceRow & string>[] = [
+  reportColumn("date"),
+  reportColumn("number"),
+  reportColumn("customerName"),
+  {
+    key: "invoiceCount",
+    label: "Invoices Bundled",
+    labelId: "Faktur Digabung",
+    format: "number",
+    // The sum is the point: how many invoices the whole report covers.
+    total: true,
+    width: 150
+  },
+  reportColumn("dueDate"),
+  reportColumn("status"),
+  reportColumn("tags"),
+  reportColumn("total"),
+  reportColumn("balanceDue")
+];
+
+/** The Sales list projection for join invoices, plus the bundle size. */
+export function buildJoinInvoiceRows(): JoinInvoiceRow[] {
+  const byId = new Map(getSalesTransactions().map((t) => [t.id, t]));
+  return buildSalesReportRows("join_invoice").map((row) => ({
+    ...row,
+    invoiceCount: byId.get(row.id)?.joinedInvoiceIds.length ?? 0
+  }));
 }
 
 // ---------------------------------------------------------------------------
