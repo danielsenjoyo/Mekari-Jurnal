@@ -32,6 +32,7 @@ import { SALES_STATUS_LABEL, type SalesStatus } from "./sales-status";
 import { parseLocalIsoDate } from "~/utils/dates";
 import {
   PRODUCT_OPTIONS,
+  TAX_OPTIONS,
   TRANSACTION_TYPE_LABEL,
   getSalesTransactions,
   type SalesTransaction,
@@ -462,6 +463,108 @@ export function buildJoinInvoiceRows(): JoinInvoiceRow[] {
     ...row,
     invoiceCount: byId.get(row.id)?.joinedInvoiceIds.length ?? 0
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Sales tax
+//
+// "Shows taxable amount, tax rate, and tax amount with the value added tax used
+// in transactions in a certain period" — so a listing of the tax charged, not a
+// summary by rate. Also built rather than ported: no Vue page in
+// `jurnal-frontend-app`.
+// ---------------------------------------------------------------------------
+
+export interface SalesTaxRow {
+  /** Composite — a transaction can carry more than one tax label. */
+  id: string;
+  transactionId: number;
+  date: string;
+  number: string;
+  customerName: string;
+  taxName: string;
+  /** DPP — the line value the rate was applied to. */
+  taxableAmount: number;
+  taxRate: number;
+  taxAmount: number;
+}
+
+export const SALES_TAX_COLUMNS: ReportColumn<keyof SalesTaxRow & string>[] = [
+  { key: "date", label: "Date", labelId: "Tanggal", format: "date", width: 120 },
+  { key: "number", label: "Transaction No.", labelId: "No. Transaksi", width: 190 },
+  { key: "customerName", label: "Customer", labelId: "Pelanggan", width: 200 },
+  { key: "taxName", label: "Tax Name", labelId: "Nama Pajak", width: 140 },
+  {
+    key: "taxableAmount",
+    label: "Taxable Amount (DPP)",
+    labelId: "Dasar Pengenaan Pajak (DPP)",
+    format: "money",
+    width: 190
+  },
+  // A rate is a property of each row, not a quantity — summing a column of them
+  // would produce a number with no meaning.
+  {
+    key: "taxRate",
+    label: "Tax Rate (%)",
+    labelId: "Tarif Pajak (%)",
+    format: "percent",
+    width: 130
+  },
+  { key: "taxAmount", label: "Tax Amount", labelId: "Jumlah Pajak", format: "money", width: 170 }
+];
+
+/**
+ * One row per **transaction × tax label**, over invoices only.
+ *
+ * Invoices and nothing else: a quotation or an order in this dataset carries a
+ * tax figure, but neither creates a tax liability — only the invoice does. A
+ * tax report that added up quotations would overstate what is owed, which is a
+ * worse failure than a missing filter.
+ *
+ * The grain is per tax label rather than per transaction because a single
+ * invoice can mix rates: `TAX_OPTIONS` offers PPN 11%, PPN 12% and Non-taxable,
+ * and the form sets them per line. Every generated record is on PPN 11%, so
+ * today this is one row per invoice — but a record created through the form
+ * with two rates on it produces two rows, each with its own DPP, which is what
+ * makes the Tax Name and Tax Rate columns worth having.
+ *
+ * Lines with no tax label are skipped: there is nothing to report on a value
+ * that was never taxed. `Non-taxable` is a declared treatment rather than an
+ * absence, so it stays, at rate 0.
+ */
+export function buildSalesTaxRows(): SalesTaxRow[] {
+  const rateFor = new Map(TAX_OPTIONS.map((t) => [t.label, t.rate]));
+
+  return getSalesTransactions()
+    .filter((t) => t.type === "invoice" && t.status !== "rejected")
+    .flatMap((t) => {
+      // DPP per label, off the lines — the tax is charged on what the lines are
+      // worth, so the base has to be derived from the same place.
+      const baseByLabel = new Map<string, number>();
+      t.lines.forEach((line) => {
+        if (!line.tax) return;
+        baseByLabel.set(line.tax, (baseByLabel.get(line.tax) ?? 0) + line.amount);
+      });
+
+      return [...baseByLabel.entries()].map(([label, base]) => {
+        const rate = rateFor.get(label) ?? 0;
+        // Prefer the transaction's own `taxes` entry where there is one, so the
+        // report never disagrees with the figure on the invoice itself; fall
+        // back to the rate for a label the record didn't summarise.
+        const stated = t.taxes.find((tax) => tax.label === label)?.amount;
+        return {
+          id: `${t.id}-${label}`,
+          transactionId: t.id,
+          date: t.transactionDateSort,
+          number: t.number,
+          customerName: t.customerName,
+          taxName: label,
+          taxableAmount: base,
+          taxRate: rate,
+          taxAmount: stated ?? Math.round((base * rate) / 100)
+        };
+      });
+    })
+    .sort((a, b) => a.date.localeCompare(b.date) || a.taxName.localeCompare(b.taxName));
 }
 
 // ---------------------------------------------------------------------------

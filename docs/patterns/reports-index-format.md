@@ -93,13 +93,14 @@ what an old link opens.
 ## Where a card goes
 
 Every card links to `/reports/<slug>`. A slug with a real page wins — Nuxt
-prefers a static route over the dynamic one — so the fifteen built reports
+prefers a static route over the dynamic one — so the sixteen built reports
 (`purchases_list`, `purchases_by_vendor`, `purchases_delivery`,
 `purchases_by_product`, `purchases_order_completion`, their Sales counterparts
 `sales_list`, `sales_by_customer`, `sales_delivery`, `sales_by_product`,
 `sales_order_completion`, plus `product_profitability`,
-`proforma_invoice_list`, `merged_invoice_list`, `customer_balance` and
-`aged_receivable`) resolve to their own pages, built to
+`proforma_invoice_list`, `merged_invoice_list`, `customer_balance`,
+`aged_receivable` and the Tax tab's `sales_tax_report`) resolve to their own
+pages, built to
 [`reports-page-format`](./reports-page-format.md).
 
 Every card on the Sales tab now lands on a real page. The last two —

@@ -3,7 +3,7 @@
 > A **report** screen: pick a date range and criteria, press a button, read a
 > table with a TOTAL row. Looks like an index page and isn't one.
 > Reference impl: [`app/pages/reports/purchases_list.vue`](../../app/pages/reports/purchases_list.vue)
-> — the other fourteen reports (four Purchases, ten Sales) are the same five
+> — the other fifteen reports (four Purchases, eleven Sales) are the same five
 > components with different columns.
 > Shared chrome: [`ReportFilterBar`](../../app/components/reports/ReportFilterBar.vue),
 > [`ReportTable`](../../app/components/reports/ReportTable.vue),
@@ -65,11 +65,11 @@ through to the default.
 | Purchase by product       | one **product**, aggregated         | Filter applies per transaction, not per row     |
 | Purchase order completion | one order                           | Links order → its delivery                      |
 
-## The ten Sales reports
+## The eleven Sales reports
 
 The first five are the AR mirror of the table above, one for one — same five
-shapes, same five components, `vendorName` → `customerName`. The last five
-have no AP counterpart:
+shapes, same five components, `vendorName` → `customerName`. The last six have
+no AP counterpart:
 
 | Report                 | Rows are                             | Notable                                                        |
 | ---------------------- | ------------------------------------ | -------------------------------------------------------------- |
@@ -83,19 +83,37 @@ have no AP counterpart:
 | Join invoice list      | one join invoice                     | Nine columns, not sixteen — see below                          |
 | Customer balance       | one unpaid invoice, customer-ordered | **As of one date**, not a range                                |
 | Aged receivable        | one customer                         | **As of one date**; columns are age bands, not fields          |
+| Sales tax              | one invoice × tax label              | Invoices only; lives on the **Tax** tab, not Sales             |
 
-### Four of them were built, not ported
+### Five of them were built, not ported
 
-Pro forma invoice list, Join invoice list, Customer balance and Aged receivable
-have **no Vue page in `jurnal-frontend-app`** to port — production still renders
-all four server-side. They are built to this document instead, from what their
+Pro forma invoice list, Join invoice list, Customer balance, Aged receivable
+and Sales tax have **no Vue page in `jurnal-frontend-app`** to port — production
+still renders all five server-side. They are built to this document instead, from what their
 cards on the Reports index promise.
 
 For the two invoice lists that promise is the Sales list pinned to one
 transaction type ("Shows all created proforma invoices in a certain period"), so
 that is what they are: same composable, same drawer,
-`defaults: { transactionType }` and a column set of their own. The other two are
-a different shape entirely — see § As of a date, not over a range.
+`defaults: { transactionType }` and a column set of their own. Customer balance
+and Aged receivable are a different shape entirely — see § As of a date, not
+over a range.
+
+**Sales tax** is a listing, not a summary. Its card promises "taxable amount,
+tax rate, and tax amount … used in transactions", so the rows are one per
+**invoice × tax label** — not one per rate. The grain is per label because a
+single invoice can mix them: `TAX_OPTIONS` offers PPN 11%, PPN 12% and
+Non-taxable, and the form sets one per line. Every generated record is on PPN
+11%, so today it renders one row per invoice; a form-built record with two rates
+produces two rows, each with its own DPP, which is what earns the Tax Name and
+Tax Rate columns their place.
+
+It reports **invoices only**. Quotations and orders in this dataset carry a tax
+figure, but neither creates a liability — a tax report that added them up would
+overstate what is owed, which is a worse failure than a missing filter. Rejected
+invoices are out for the same reason. Where the record summarises a label in its
+own `taxes` array that figure wins, so the report can never disagree with the
+invoice it came from.
 
 **Their column sets are trimmed to what the document actually carries**, which
 is the whole reason they aren't literally `sales_list`. A join invoice has no
