@@ -32,6 +32,7 @@
       v-model:start-date="filter.startDate"
       v-model:end-date="filter.endDate"
       v-model:period-id="filter.periodId"
+      :periods="PURCHASE_REPORT_PERIODS"
       :is-valid="isRangeValid"
       :is-filter-active="isDrawerFilterActive"
       @run="runReport"

@@ -22,14 +22,14 @@
  */
 
 import { PURCHASE_STATUS_LABEL, type PurchaseStatus } from "./purchase-status";
-import type { ReportColumn } from "./report-column";
+import type { ReportColumn, ReportLayout } from "./report-column";
+import { DEFAULT_PERIOD_ID, buildReportPeriods, type ReportPeriod } from "./report-period";
 import {
   TRANSACTION_TYPE_LABEL,
   getPurchaseTransactions,
   todayIsoDate,
   type TransactionType
 } from "./purchase-transactions";
-import { parseLocalIsoDate, toLocalIsoDate } from "~/utils/dates";
 
 // ---------------------------------------------------------------------------
 // Columns
@@ -93,20 +93,13 @@ export function reportColumn(key: keyof PurchaseReportRow): PurchaseReportColumn
 // Layouts (production's "templates")
 // ---------------------------------------------------------------------------
 
-export interface ReportLayout {
-  id: string;
-  name: string;
-  nameId: string;
-  columns: (keyof PurchaseReportRow)[];
-}
-
 /**
  * Production lets a company save any number of column layouts and edit them in
  * a builder at `/reports/purchases_list/custom_layouts/…`. With no backend to
  * persist one, this prototype ships three fixed sets — enough to show what
  * switching a template does to the table, which is the part worth prototyping.
  */
-export const PURCHASE_REPORT_LAYOUTS: ReportLayout[] = [
+export const PURCHASE_REPORT_LAYOUTS: ReportLayout<keyof PurchaseReportRow & string>[] = [
   {
     id: "standard",
     name: "Standard",
@@ -145,132 +138,15 @@ export const PURCHASE_REPORT_LAYOUTS: ReportLayout[] = [
 // Period presets
 // ---------------------------------------------------------------------------
 
-export interface ReportPeriod {
-  id: string;
-  label: string;
-  labelId: string;
-  /** `null` for "Custom" — the two date fields stand on their own. */
-  range: (() => { start: string; end: string }) | null;
-}
-
-/** "Today" is the fixture's today (2 Sep 2026), not the wall clock — the whole
- *  Purchases dataset is generated relative to it. */
-function today(): Date {
-  return parseLocalIsoDate(todayIsoDate());
-}
-
-function shift(base: Date, days: number): Date {
-  const d = new Date(base);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-function startOfWeek(d: Date): Date {
-  // Monday-first, matching the Indonesian business week production assumes.
-  const day = (d.getDay() + 6) % 7;
-  return shift(d, -day);
-}
-
-function range(start: Date, end: Date) {
-  return { start: toLocalIsoDate(start), end: toLocalIsoDate(end) };
-}
-
-/** The 11 presets from production's `PERIODS_RANGE`, in the same order. */
-export const PURCHASE_REPORT_PERIODS: ReportPeriod[] = [
-  { id: "today", label: "Today", labelId: "Hari ini", range: () => range(today(), today()) },
-  {
-    id: "this_week",
-    label: "This week",
-    labelId: "Minggu ini",
-    range: () => range(startOfWeek(today()), shift(startOfWeek(today()), 6))
-  },
-  {
-    id: "this_month",
-    label: "This month",
-    labelId: "Bulan ini",
-    range: () => {
-      const t = today();
-      return range(
-        new Date(t.getFullYear(), t.getMonth(), 1),
-        new Date(t.getFullYear(), t.getMonth() + 1, 0)
-      );
-    }
-  },
-  {
-    id: "this_quarter",
-    label: "This quarter",
-    labelId: "Kuartal ini",
-    range: () => {
-      const t = today();
-      const q = Math.floor(t.getMonth() / 3);
-      return range(new Date(t.getFullYear(), q * 3, 1), new Date(t.getFullYear(), q * 3 + 3, 0));
-    }
-  },
-  {
-    id: "this_year",
-    label: "This year",
-    labelId: "Tahun ini",
-    range: () => {
-      const t = today();
-      return range(new Date(t.getFullYear(), 0, 1), new Date(t.getFullYear(), 11, 31));
-    }
-  },
-  {
-    id: "yesterday",
-    label: "Yesterday",
-    labelId: "Kemarin",
-    range: () => range(shift(today(), -1), shift(today(), -1))
-  },
-  {
-    id: "last_week",
-    label: "Last week",
-    labelId: "Minggu lalu",
-    range: () => {
-      const start = shift(startOfWeek(today()), -7);
-      return range(start, shift(start, 6));
-    }
-  },
-  {
-    id: "last_month",
-    label: "Last month",
-    labelId: "Bulan lalu",
-    range: () => {
-      const t = today();
-      return range(
-        new Date(t.getFullYear(), t.getMonth() - 1, 1),
-        new Date(t.getFullYear(), t.getMonth(), 0)
-      );
-    }
-  },
-  {
-    id: "last_quarter",
-    label: "Last quarter",
-    labelId: "Kuartal lalu",
-    range: () => {
-      const t = today();
-      const q = Math.floor(t.getMonth() / 3);
-      return range(new Date(t.getFullYear(), (q - 1) * 3, 1), new Date(t.getFullYear(), q * 3, 0));
-    }
-  },
-  {
-    id: "last_year",
-    label: "Last year",
-    labelId: "Tahun lalu",
-    range: () => {
-      const t = today();
-      return range(new Date(t.getFullYear() - 1, 0, 1), new Date(t.getFullYear() - 1, 11, 31));
-    }
-  },
-  { id: "custom", label: "Custom", labelId: "Custom", range: null }
-];
-
 /**
- * Production defaults to "Today", because a real company books transactions
- * every day. This fixture holds 13 records per type spread over ~5 weeks, so
- * "Today" would return a single row and show nothing worth looking at —
- * default to the quarter that contains the whole set instead.
+ * The 11 presets, resolved against the fixture's today (2 Sep 2026) rather than
+ * the wall clock — the whole Purchases dataset is generated relative to it.
+ * Sales offers the same list against its own fixture; see
+ * [`report-period.ts`](./report-period.ts).
  */
-export const DEFAULT_PERIOD_ID = "this_quarter";
+export const PURCHASE_REPORT_PERIODS: ReportPeriod[] = buildReportPeriods(todayIsoDate);
+
+export { DEFAULT_PERIOD_ID, type ReportPeriod };
 
 // ---------------------------------------------------------------------------
 // Filter options

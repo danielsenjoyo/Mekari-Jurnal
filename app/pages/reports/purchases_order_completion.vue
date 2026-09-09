@@ -12,6 +12,7 @@
       v-model:start-date="filter.startDate"
       v-model:end-date="filter.endDate"
       v-model:period-id="filter.periodId"
+      :periods="PURCHASE_REPORT_PERIODS"
       :is-valid="isRangeValid"
       :is-filter-active="isDrawerFilterActive"
       @run="runReport"
@@ -111,6 +112,7 @@ import {
   type OrderCompletionRow
 } from "~/data/purchase-report-variants";
 import { matchesPurchaseReportFilter } from "~/data/purchase-report-filter";
+import { PURCHASE_REPORT_PERIODS } from "~/data/purchase-report";
 import { PURCHASE_STATUS_TYPE, type PurchaseStatus } from "~/data/purchase-status";
 import { textlinkAlignClass } from "~/utils/textlink-align";
 

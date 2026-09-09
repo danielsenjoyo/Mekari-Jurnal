@@ -37,6 +37,20 @@ export interface ReportColumn<K extends string = string> {
   total?: boolean;
 }
 
+/**
+ * A named column set — what production calls a report "template", and what the
+ * Template ▾ picker in a report's title band switches between.
+ *
+ * Generic over the row's own keys so a layout can only ever name columns that
+ * report actually has, while the shape stays shared across modules.
+ */
+export interface ReportLayout<K extends string = string> {
+  id: string;
+  name: string;
+  nameId: string;
+  columns: K[];
+}
+
 /** Whether a column's cells sit right of centre. */
 export function isRightAligned(col: ReportColumn): boolean {
   if (col.align) return col.align === "right";

@@ -8,6 +8,7 @@
       v-model:start-date="filter.startDate"
       v-model:end-date="filter.endDate"
       v-model:period-id="filter.periodId"
+      :periods="PURCHASE_REPORT_PERIODS"
       :is-valid="isRangeValid"
       :is-filter-active="isDrawerFilterActive"
       @run="runReport"
@@ -99,7 +100,7 @@ import {
 } from "~/data/purchase-report-variants";
 import { matchesPurchaseReportFilter } from "~/data/purchase-report-filter";
 import { TRANSACTION_TYPE_LABEL, type TransactionType } from "~/data/purchase-transactions";
-import { PURCHASE_TRANSACTION_ROUTE } from "~/data/purchase-report";
+import { PURCHASE_REPORT_PERIODS, PURCHASE_TRANSACTION_ROUTE } from "~/data/purchase-report";
 import { textlinkAlignClass } from "~/utils/textlink-align";
 
 useHead({ title: "Purchase by vendor — Mekari Jurnal" });

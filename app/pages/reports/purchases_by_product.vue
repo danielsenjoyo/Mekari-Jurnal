@@ -8,6 +8,7 @@
       v-model:start-date="filter.startDate"
       v-model:end-date="filter.endDate"
       v-model:period-id="filter.periodId"
+      :periods="PURCHASE_REPORT_PERIODS"
       :is-valid="isRangeValid"
       :is-filter-active="isDrawerFilterActive"
       @run="runReport"
@@ -87,6 +88,7 @@ import {
   type ProductReportRow
 } from "~/data/purchase-report-variants";
 import { matchesPurchaseReportFilter } from "~/data/purchase-report-filter";
+import { PURCHASE_REPORT_PERIODS } from "~/data/purchase-report";
 import { TRANSACTION_TYPE_LABEL } from "~/data/purchase-transactions";
 
 useHead({ title: "Purchase by product — Mekari Jurnal" });
