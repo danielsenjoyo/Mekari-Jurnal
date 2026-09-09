@@ -161,7 +161,9 @@
           <div :class="metaFieldClass">
             <MpText color="gray.600">Tags</MpText>
             <MpFlex v-if="record.tags.length" gap="2" flex-wrap="wrap">
-              <MpTag v-for="tag in record.tags" :key="tag" variant="gray" size="sm">{{ tag }}</MpTag>
+              <MpTag v-for="tag in record.tags" :key="tag" variant="gray" size="sm">{{
+                tag
+              }}</MpTag>
             </MpFlex>
             <MpText v-else>—</MpText>
           </div>
@@ -337,7 +339,9 @@
       <div :class="bottomActionsClass">
         <MpButton variant="ghost" @click="isDeleteModalOpen = true">Delete</MpButton>
         <MpFlex gap="2">
-          <MpButton variant="secondary" @click="navigateTo(`/sales/proforma-order/edit/${record.id}`)"
+          <MpButton
+            variant="secondary"
+            @click="navigateTo(`/sales/proforma-order/edit/${record.id}`)"
             >Edit</MpButton
           >
           <MpPopover placement="bottom-end" use-portal is-adaptive-width>
@@ -472,7 +476,9 @@ const linkedOrder = computed(() =>
 
 useHead({
   title: computed(() =>
-    record.value ? `${record.value.number} — Mekari Jurnal` : "Pro forma order not found — Mekari Jurnal"
+    record.value
+      ? `${record.value.number} — Mekari Jurnal`
+      : "Pro forma order not found — Mekari Jurnal"
   )
 });
 

@@ -238,7 +238,9 @@
               </MpPopoverContent>
             </template>
           </MpPopover>
-          <MpButton variant="primary" @click="onAction('receive-payment')">Receive payment</MpButton>
+          <MpButton variant="primary" @click="onAction('receive-payment')"
+            >Receive payment</MpButton
+          >
         </MpFlex>
       </div>
     </template>

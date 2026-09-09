@@ -84,8 +84,8 @@
             />
           </MpInputGroup>
           <MpFormHelpText v-if="form.linkedOrderId && !overBilled">
-            {{ alreadyBilledPercent }}% of this order is already billed —
-            {{ remainingPercent }}% remains.
+            {{ alreadyBilledPercent }}% of this order is already billed — {{ remainingPercent }}%
+            remains.
           </MpFormHelpText>
           <MpFormErrorMessage>
             Only {{ remainingPercent }}% of this order is left to bill.
@@ -510,7 +510,8 @@ const missingFields = computed(() => {
   const missing: string[] = [];
   if (!form.linkedOrderId) missing.push("Sales order");
   if (!form.transactionDateIso) missing.push("Transaction date");
-  if (overBilled.value) missing.push(`a share within the ${remainingPercent.value}% still unbilled`);
+  if (overBilled.value)
+    missing.push(`a share within the ${remainingPercent.value}% still unbilled`);
   return missing;
 });
 
@@ -556,8 +557,7 @@ function onSubmit() {
 }
 
 function onCancel() {
-  if (isEdit.value && props.recordId != null)
-    navigateTo(`/sales/proforma-order/${props.recordId}`);
+  if (isEdit.value && props.recordId != null) navigateTo(`/sales/proforma-order/${props.recordId}`);
   else if (form.linkedOrderId) navigateTo(`/sales/order/${form.linkedOrderId}`);
   else navigateTo("/sales");
 }

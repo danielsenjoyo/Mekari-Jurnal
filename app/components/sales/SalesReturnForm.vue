@@ -233,40 +233,40 @@
               </MpTableCell>
             </MpTableRow>
             <MpTableRow v-for="line in group.lines" :key="line.key">
-            <MpTableCell as="td" :class="lineCellClass">
-              <MpText>{{ line.product }}</MpText>
-            </MpTableCell>
-            <MpTableCell as="td" :class="[lineCellClass, wrapCellClass]">{{
-              line.description || "—"
-            }}</MpTableCell>
-            <MpTableCell as="td" :class="lineCellClass">
-              <MpInput
-                v-model.number="line.quantity"
-                type="number"
-                min="0"
-                :max="line.maxQuantity"
-                :is-invalid="line.quantity > line.maxQuantity"
-                is-full-width
-              />
-              <!-- Plain MpText, not MpFormHelpText: the help-text part reads
+              <MpTableCell as="td" :class="lineCellClass">
+                <MpText>{{ line.product }}</MpText>
+              </MpTableCell>
+              <MpTableCell as="td" :class="[lineCellClass, wrapCellClass]">{{
+                line.description || "—"
+              }}</MpTableCell>
+              <MpTableCell as="td" :class="lineCellClass">
+                <MpInput
+                  v-model.number="line.quantity"
+                  type="number"
+                  min="0"
+                  :max="line.maxQuantity"
+                  :is-invalid="line.quantity > line.maxQuantity"
+                  is-full-width
+                />
+                <!-- Plain MpText, not MpFormHelpText: the help-text part reads
                    its state from MpFormControl's provided context, so outside
                    one it throws on render (reading 'value' of undefined). -->
-              <MpText size="body-small" color="gray.600"
-                >Returnable qty {{ line.maxQuantity }}</MpText
-              >
-            </MpTableCell>
-            <MpTableCell as="td" :class="lineCellClass">
-              <MpText color="gray.600">{{ line.unit || "—" }}</MpText>
-            </MpTableCell>
-            <MpTableCell as="td" :class="lineCellClass">
-              <MpText color="gray.600">{{ line.discountPercent }}%</MpText>
-            </MpTableCell>
-            <MpTableCell as="td" :class="[lineCellClass, numCellClass]">
-              <MpText>{{ formatCurrency(line.unitPrice) }}</MpText>
-            </MpTableCell>
-            <MpTableCell as="td" :class="[lineCellClass, numCellClass]">
-              <MpText>{{ formatCurrency(computeLineAmount(line)) }}</MpText>
-            </MpTableCell>
+                <MpText size="body-small" color="gray.600"
+                  >Returnable qty {{ line.maxQuantity }}</MpText
+                >
+              </MpTableCell>
+              <MpTableCell as="td" :class="lineCellClass">
+                <MpText color="gray.600">{{ line.unit || "—" }}</MpText>
+              </MpTableCell>
+              <MpTableCell as="td" :class="lineCellClass">
+                <MpText color="gray.600">{{ line.discountPercent }}%</MpText>
+              </MpTableCell>
+              <MpTableCell as="td" :class="[lineCellClass, numCellClass]">
+                <MpText>{{ formatCurrency(line.unitPrice) }}</MpText>
+              </MpTableCell>
+              <MpTableCell as="td" :class="[lineCellClass, numCellClass]">
+                <MpText>{{ formatCurrency(computeLineAmount(line)) }}</MpText>
+              </MpTableCell>
             </MpTableRow>
           </template>
 
@@ -712,7 +712,9 @@ function loadFromExisting() {
   discountValue.value = r.discountValue;
   if (r.linkedInvoiceId != null) {
     form.deliveryIds = [...r.deliveryIds];
-    loadLines(new Map(r.lines.map((l) => [lineKeyFor(l.deliveryId ?? null, l.product), l.quantity])));
+    loadLines(
+      new Map(r.lines.map((l) => [lineKeyFor(l.deliveryId ?? null, l.product), l.quantity]))
+    );
   }
 }
 watch(existing, loadFromExisting, { immediate: true });

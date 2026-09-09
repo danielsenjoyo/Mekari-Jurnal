@@ -390,7 +390,11 @@ function buildTransaction(type: TransactionType, i: number, seq: number): SalesT
   // A record waiting on approval is a DRAFT — that is what the real product
   // shows in its Status column, and it is why the queue exists: nothing is
   // live until someone signs it off. Approving promotes it to Open.
-  const status: SalesStatus = rejected ? "rejected" : needsApproval ? "draft" : pool[i % pool.length]!;
+  const status: SalesStatus = rejected
+    ? "rejected"
+    : needsApproval
+      ? "draft"
+      : pool[i % pool.length]!;
 
   const lines = buildLines(seq);
   const subtotal = lines.reduce((sum, l) => sum + l.amount, 0);
@@ -976,9 +980,7 @@ export const computeInvoiceTotals = computeTransactionTotals;
 function num(value: number): number {
   return Number(value) || 0;
 }
-function lineGrossAmount(
-  line: Pick<SalesTransactionLineInput, "quantity" | "unitPrice">
-): number {
+function lineGrossAmount(line: Pick<SalesTransactionLineInput, "quantity" | "unitPrice">): number {
   return num(line.quantity) * num(line.unitPrice);
 }
 function lineNetAmount(

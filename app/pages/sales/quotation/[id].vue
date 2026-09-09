@@ -73,7 +73,9 @@
         </div>
 
         <div :class="balanceColClass">
-          <MpText weight="semiBold" color="dark">Total {{ formatCurrency(quotation.total) }}</MpText>
+          <MpText weight="semiBold" color="dark"
+            >Total {{ formatCurrency(quotation.total) }}</MpText
+          >
           <MpText size="body-small" color="gray.600"
             >Valid until {{ formatDisplayDate(quotation.dueDateSort) }}</MpText
           >
@@ -123,7 +125,9 @@
           <div :class="metaFieldClass">
             <MpText color="gray.600">Tags</MpText>
             <MpFlex v-if="quotation.tags.length" gap="2" flex-wrap="wrap">
-              <MpTag v-for="tag in quotation.tags" :key="tag" variant="gray" size="sm">{{ tag }}</MpTag>
+              <MpTag v-for="tag in quotation.tags" :key="tag" variant="gray" size="sm">{{
+                tag
+              }}</MpTag>
             </MpFlex>
             <MpText v-else>—</MpText>
           </div>
@@ -212,7 +216,9 @@
           </div>
           <div v-if="quotation.discountAmount > 0" :class="totalsRowClass">
             <MpText color="gray.600">
-              Discount{{ quotation.discountType === "percent" ? ` (${quotation.discountValue}%)` : "" }}
+              Discount{{
+                quotation.discountType === "percent" ? ` (${quotation.discountValue}%)` : ""
+              }}
             </MpText>
             <MpText color="gray.600">{{ formatCurrency(quotation.discountAmount) }}</MpText>
           </div>
@@ -240,8 +246,8 @@
         :class="[lastUpdatedClass, textlinkAlignClass]"
         @click="onAction('view-audit-log')"
       >
-        Last updated by Rizal Candra on {{ formatDisplayDate(quotation.transactionDateSort) }} 09:00:00
-        AM GMT +7
+        Last updated by Rizal Candra on
+        {{ formatDisplayDate(quotation.transactionDateSort) }} 09:00:00 AM GMT +7
       </MpTextlink>
 
       <!-- A quotation's whole purpose is to become something else, so its Actions
@@ -383,7 +389,9 @@ const adjacent = computed(() => getAdjacentTransactionIds(id.value));
 
 useHead({
   title: computed(() =>
-    quotation.value ? `${quotation.value.number} — Mekari Jurnal` : "Quotation not found — Mekari Jurnal"
+    quotation.value
+      ? `${quotation.value.number} — Mekari Jurnal`
+      : "Quotation not found — Mekari Jurnal"
   )
 });
 

@@ -35,7 +35,10 @@ export const QUOTA_ACTION_OPTIONS: { value: QuotaAction | ""; label: string }[] 
   { value: "sales_invoice_creation", label: QUOTA_ACTION_LABEL.sales_invoice_creation },
   { value: "sales_invoice_deletion", label: QUOTA_ACTION_LABEL.sales_invoice_deletion },
   { value: "sales_invoice_import", label: QUOTA_ACTION_LABEL.sales_invoice_import },
-  { value: "sales_invoice_additional_quota", label: QUOTA_ACTION_LABEL.sales_invoice_additional_quota },
+  {
+    value: "sales_invoice_additional_quota",
+    label: QUOTA_ACTION_LABEL.sales_invoice_additional_quota
+  },
   { value: "sales_invoice_reset_quota", label: QUOTA_ACTION_LABEL.sales_invoice_reset_quota },
   { value: "integration", label: QUOTA_ACTION_LABEL.integration }
 ];

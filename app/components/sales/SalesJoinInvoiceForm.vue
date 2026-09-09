@@ -192,7 +192,11 @@
     </MpText>
     <!-- The source app's own bound: joining one invoice achieves nothing, and
          the batch is capped at 150 (returns/i18n.json → invalid_invoice_line). -->
-    <MpFormControl v-if="submitted && !hasValidSelection" :is-invalid="true" :class="lineErrorClass">
+    <MpFormControl
+      v-if="submitted && !hasValidSelection"
+      :is-invalid="true"
+      :class="lineErrorClass"
+    >
       <MpFormErrorMessage>Min. 2 invoices &amp; max. 150 invoices.</MpFormErrorMessage>
     </MpFormControl>
 
@@ -426,8 +430,7 @@ const totals = computed(() => ({
 }));
 
 const hasValidSelection = computed(
-  () =>
-    joinedInvoices.value.length >= MIN_JOINED && joinedInvoices.value.length <= MAX_JOINED
+  () => joinedInvoices.value.length >= MIN_JOINED && joinedInvoices.value.length <= MAX_JOINED
 );
 const isValid = computed(
   () => Boolean(form.customerName && form.dueDateIso) && hasValidSelection.value

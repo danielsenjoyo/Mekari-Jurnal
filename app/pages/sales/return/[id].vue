@@ -214,27 +214,27 @@
                 </MpTableCell>
               </MpTableRow>
               <MpTableRow v-for="line in group.lines" :key="line.id">
-              <MpTableCell as="td">
-                <MpTextlink
-                  as="button"
-                  variant="primary"
-                  :class="textlinkCellClass"
-                  @click="onAction('view-product')"
-                  >{{ line.product }}</MpTextlink
-                >
-              </MpTableCell>
-              <MpTableCell as="td" :class="wrapCellClass">{{
-                line.description || "—"
-              }}</MpTableCell>
-              <MpTableCell as="td" :class="numCellClass">{{ line.quantity }}</MpTableCell>
-              <MpTableCell as="td">{{ line.unit }}</MpTableCell>
-              <MpTableCell as="td" :class="numCellClass">{{
-                formatCurrency(line.unitPrice)
-              }}</MpTableCell>
-              <MpTableCell as="td" :class="numCellClass">{{ line.discountPercent }}%</MpTableCell>
-              <MpTableCell as="td" :class="numCellClass">{{
-                formatCurrency(line.amount)
-              }}</MpTableCell>
+                <MpTableCell as="td">
+                  <MpTextlink
+                    as="button"
+                    variant="primary"
+                    :class="textlinkCellClass"
+                    @click="onAction('view-product')"
+                    >{{ line.product }}</MpTextlink
+                  >
+                </MpTableCell>
+                <MpTableCell as="td" :class="wrapCellClass">{{
+                  line.description || "—"
+                }}</MpTableCell>
+                <MpTableCell as="td" :class="numCellClass">{{ line.quantity }}</MpTableCell>
+                <MpTableCell as="td">{{ line.unit }}</MpTableCell>
+                <MpTableCell as="td" :class="numCellClass">{{
+                  formatCurrency(line.unitPrice)
+                }}</MpTableCell>
+                <MpTableCell as="td" :class="numCellClass">{{ line.discountPercent }}%</MpTableCell>
+                <MpTableCell as="td" :class="numCellClass">{{
+                  formatCurrency(line.amount)
+                }}</MpTableCell>
               </MpTableRow>
             </template>
           </MpTableBody>
