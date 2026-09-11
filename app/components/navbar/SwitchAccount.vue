@@ -11,8 +11,8 @@
         >
           <MpAvatar
             :class="avatarClass"
-            :src="accountInformation.userPhoto"
-            :alt="accountInformation.fullName"
+            :name="accountInformation.fullName"
+            variant-color="violet"
             size="md"
           />
           <span :class="labelClass">

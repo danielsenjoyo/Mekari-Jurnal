@@ -6,8 +6,8 @@
       <header :class="headerClass">
         <MpAvatar
           :class="avatarClass"
-          :src="accountInformation.userPhoto"
-          :alt="accountInformation.fullName"
+          :name="accountInformation.fullName"
+          variant-color="violet"
           size="lg"
         />
         <div :class="headerTextClass">

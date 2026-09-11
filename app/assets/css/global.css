@@ -53,3 +53,124 @@
     display: block;
   }
 }
+
+/* Airene assistant — rotating gradient border on the ask-input.
+   Colours reference Pixel blue tokens; the conic gradient spins via an
+   animated @property angle (padding-box keeps the fill white). */
+@property --airene-border-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes airene-border-spin {
+  to {
+    --airene-border-angle: 360deg;
+  }
+}
+
+.airene-input-bar {
+  border: 1.5px solid transparent;
+  border-radius: var(--border-radius-full);
+  background:
+    linear-gradient(var(--mp-colors-white), var(--mp-colors-white)) padding-box,
+    conic-gradient(
+        from var(--airene-border-angle),
+        var(--mp-colors-blue-700),
+        var(--mp-colors-blue-500),
+        var(--mp-colors-blue-100),
+        var(--mp-colors-blue-500),
+        var(--mp-colors-blue-700)
+      )
+      border-box;
+  animation: airene-border-spin 3s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .airene-input-bar {
+    animation: none;
+  }
+}
+
+/* Airene assistant modal — subtle slide-up entrance + overlay fade.
+   Easing/duration reference the project-local motion + Pixel duration tokens. */
+.airene-overlay-enter-active,
+.airene-overlay-leave-active {
+  transition: opacity var(--mp-durations-normal) var(--motion-ease-in-out);
+}
+.airene-overlay-enter-from,
+.airene-overlay-leave-to {
+  opacity: 0;
+}
+
+.airene-modal-enter-active,
+.airene-modal-leave-active {
+  transition: transform 360ms var(--motion-ease-out);
+}
+.airene-modal-enter-from,
+.airene-modal-leave-to {
+  transform: translateY(100%);
+}
+
+/* Airene assistant — "typing" indicator (three bouncing dots). */
+.airene-typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--border-radius-full);
+  background-color: var(--mp-colors-blue-400);
+  display: inline-block;
+  animation: airene-typing-bounce 1.2s ease-in-out infinite;
+}
+.airene-typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.airene-typing-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes airene-typing-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .airene-typing-dot {
+    animation: none;
+  }
+}
+
+/* Airene assistant — smooth reveal when the typing indicator swaps to the answer. */
+.airene-reveal-enter-active {
+  transition:
+    opacity var(--mp-durations-normal) var(--motion-ease-out),
+    transform var(--mp-durations-normal) var(--motion-ease-out);
+}
+.airene-reveal-leave-active {
+  transition: opacity var(--mp-durations-slow) var(--motion-ease-in);
+}
+.airene-reveal-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.airene-reveal-leave-to {
+  opacity: 0;
+}
+
+/* Airene assistant — "Jump to bottom" pill fade/slide. */
+.airene-jump-enter-active,
+.airene-jump-leave-active {
+  transition:
+    opacity var(--mp-durations-slow) var(--motion-ease-out),
+    transform var(--mp-durations-slow) var(--motion-ease-out);
+}
+.airene-jump-enter-from,
+.airene-jump-leave-to {
+  opacity: 0;
+  transform: translate(-50%, 8px);
+}

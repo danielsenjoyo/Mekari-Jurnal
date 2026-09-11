@@ -44,17 +44,16 @@ const mainClass = css({
   minHeight: "100svh"
 });
 
-// Same white surface as `DefaultPageContent`'s stage, but flush to the top of
-// the shell since no title band precedes it.
+// Home's stage bleeds flush to the top of the shell: no title band, no top
+// border, no rounded top-left, no top gap — only the left border stays as the
+// separator from the sidebar. Every other page keeps DefaultPageContent's
+// bordered + rounded stage.
 const stageClass = css({
   bg: "white",
-  borderTopWidth: "sm",
   borderLeftWidth: "sm",
   borderColor: "gray.100",
-  roundedTopLeft: "md",
   px: 6,
   py: 8,
-  mt: 6,
   flex: "1 1 auto",
   minHeight: "0"
 });
