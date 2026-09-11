@@ -38,8 +38,7 @@ const ANSWERS: { match: RegExp; answer: AireneAnswer }[] = [
           url: "https://help-center.jurnal.id/hc/id/articles/4475241861913-Bagaimana-Cara-Mengajukan-Cash-Link-Feeds"
         },
         {
-          label:
-            "https://help-center.jurnal.id/hc/id/articles/4442677173145-Istilah-dan-Bahasa",
+          label: "https://help-center.jurnal.id/hc/id/articles/4442677173145-Istilah-dan-Bahasa",
           url: "https://help-center.jurnal.id/hc/id/articles/4442677173145-Istilah-dan-Bahasa"
         }
       ],
@@ -86,15 +85,13 @@ const ANSWERS: { match: RegExp; answer: AireneAnswer }[] = [
     match: /top[-\s]*selling|best[-\s]*selling|produk.*terlaris/i,
     answer: {
       title: "Top-selling product this month",
-      intro:
-        "Based on your sales data for this month, your best-selling product by quantity is:",
+      intro: "Based on your sales data for this month, your best-selling product by quantity is:",
       list: [
         "Kopi Arabica 250g — 1,240 units sold",
         "Teh Melati 100g — 980 units sold",
         "Gula Aren 500g — 610 units sold"
       ],
-      outro:
-        "You can see the full breakdown in Reports → Sales → Product Sales. Relevant link: ",
+      outro: "You can see the full breakdown in Reports → Sales → Product Sales. Relevant link: ",
       links: [
         {
           label: "https://help-center.jurnal.id/hc/id/articles/product-sales-report",
@@ -117,9 +114,7 @@ const FALLBACK = (question: string): AireneAnswer => ({
   intro:
     "Here is a summary based on Jurnal's help resources. For this prototype the response is simulated — once connected to the API, Airene will answer from live Jurnal knowledge and your company data.",
   outro: "You can explore related help articles here: ",
-  links: [
-    { label: "https://help-center.jurnal.id", url: "https://help-center.jurnal.id" }
-  ],
+  links: [{ label: "https://help-center.jurnal.id", url: "https://help-center.jurnal.id" }],
   related: ["Memulai dengan Jurnal", "Fitur Jurnal"],
   reasoning: [
     "No exact match found in the simulated knowledge base for this question.",

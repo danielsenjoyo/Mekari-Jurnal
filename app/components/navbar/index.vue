@@ -18,10 +18,7 @@
       })
     "
   >
-    <div
-      data-slot="leftContent"
-      :class="css({ display: 'flex', alignItems: 'center', flex: '1' })"
-    >
+    <div data-slot="leftContent" :class="css({ display: 'flex', alignItems: 'center', flex: '1' })">
       <NuxtLink to="/" :class="logoLinkClass">
         <img
           :class="css({ display: 'block' })"

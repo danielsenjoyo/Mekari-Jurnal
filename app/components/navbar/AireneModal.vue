@@ -5,14 +5,34 @@
         <Transition name="airene-modal" appear>
           <Pixel.div data-slot="aireneModal" :class="modalClass">
             <!-- Sidebar -->
-            <Pixel.aside :class="[sidebarBaseClass, collapsed ? sidebarCollapsedClass : sidebarExpandedClass]">
+            <Pixel.aside
+              :class="[sidebarBaseClass, collapsed ? sidebarCollapsedClass : sidebarExpandedClass]"
+            >
               <!-- Header: logo + collapse/expand toggle -->
-              <Pixel.div :class="css({ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', gap: '2', paddingX: collapsed ? '0' : '4', paddingY: '4' })">
-                <Pixel.div v-if="!collapsed" :class="css({ display: 'flex', alignItems: 'center', gap: '2' })">
+              <Pixel.div
+                :class="
+                  css({
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: collapsed ? 'center' : 'space-between',
+                    gap: '2',
+                    paddingX: collapsed ? '0' : '4',
+                    paddingY: '4'
+                  })
+                "
+              >
+                <Pixel.div
+                  v-if="!collapsed"
+                  :class="css({ display: 'flex', alignItems: 'center', gap: '2' })"
+                >
                   <MpIcon name="airene-brand" size="md" />
-                  <Pixel.div :class="css({ display: 'flex', flexDirection: 'column', lineHeight: 'none' })">
+                  <Pixel.div
+                    :class="css({ display: 'flex', flexDirection: 'column', lineHeight: 'none' })"
+                  >
                     <MpText size="overline" color="gray.500">mekari</MpText>
-                    <MpText size="body" color="gray.900" :class="css({ fontWeight: 'bold' })">airene</MpText>
+                    <MpText size="body" color="gray.900" :class="css({ fontWeight: 'bold' })"
+                      >airene</MpText
+                    >
                   </Pixel.div>
                 </Pixel.div>
 
@@ -26,15 +46,45 @@
               </Pixel.div>
 
               <!-- New chat -->
-              <Pixel.div :class="css({ paddingX: collapsed ? '0' : '3', display: 'flex', justifyContent: 'center' })">
-                <Pixel.button :class="collapsed ? newChatCollapsedClass : newChatClass" aria-label="New chat" @click="resetChat">
+              <Pixel.div
+                :class="
+                  css({
+                    paddingX: collapsed ? '0' : '3',
+                    display: 'flex',
+                    justifyContent: 'center'
+                  })
+                "
+              >
+                <Pixel.button
+                  :class="collapsed ? newChatCollapsedClass : newChatClass"
+                  aria-label="New chat"
+                  @click="resetChat"
+                >
                   <MpIcon name="chat" size="sm" color="gray.700" />
-                  <MpText v-if="!collapsed" size="body" color="gray.700" :class="css({ fontWeight: 'medium' })">New chat</MpText>
+                  <MpText
+                    v-if="!collapsed"
+                    size="body"
+                    color="gray.700"
+                    :class="css({ fontWeight: 'medium' })"
+                    >New chat</MpText
+                  >
                 </Pixel.button>
               </Pixel.div>
 
               <!-- Footer -->
-              <Pixel.div :class="css({ marginTop: 'auto', paddingX: collapsed ? '0' : '4', paddingY: '4', display: 'flex', flexDirection: 'column', alignItems: collapsed ? 'center' : 'stretch', gap: '4' })">
+              <Pixel.div
+                :class="
+                  css({
+                    marginTop: 'auto',
+                    paddingX: collapsed ? '0' : '4',
+                    paddingY: '4',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: collapsed ? 'center' : 'stretch',
+                    gap: '4'
+                  })
+                "
+              >
                 <Pixel.button :class="sidebarLinkClass" aria-label="Ask credits">
                   <MpIcon name="wallet" size="sm" color="gray.700" />
                   <MpText v-if="!collapsed" size="body" color="gray.700">Ask credits</MpText>
@@ -48,127 +98,341 @@
 
             <!-- Main -->
             <Pixel.div :class="mainClass">
-              <Pixel.div :class="css({ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: '0', height: 'var(--layout-header-height)', paddingX: '4', borderBottomWidth: 'sm', borderColor: 'gray.100' })">
-                <MpButton variant="ghost" size="sm" left-icon="close" aria-label="Close" @click="emit('close')" />
+              <Pixel.div
+                :class="
+                  css({
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    flexShrink: '0',
+                    height: 'var(--layout-header-height)',
+                    paddingX: '4',
+                    borderBottomWidth: 'sm',
+                    borderColor: 'gray.100'
+                  })
+                "
+              >
+                <MpButton
+                  variant="ghost"
+                  size="sm"
+                  left-icon="close"
+                  aria-label="Close"
+                  @click="emit('close')"
+                />
               </Pixel.div>
 
               <!-- Body: scrollable thread / empty state above a pinned input -->
               <Pixel.div :class="bodyClass">
                 <Pixel.div :class="scrollWrapperClass">
-                <Pixel.div ref="threadNode" :class="scrollClass" @scroll="onThreadScroll">
-                  <Pixel.div :class="css({ width: 'full', maxWidth: '600px', marginX: 'auto', marginTop: 'auto' })">
-                    <!-- Empty state -->
-                    <template v-if="messages.length === 0">
-                      <MpIcon name="airene-brand" size="2.5rem" />
+                  <Pixel.div ref="threadNode" :class="scrollClass" @scroll="onThreadScroll">
+                    <Pixel.div
+                      :class="
+                        css({
+                          width: 'full',
+                          maxWidth: '600px',
+                          marginX: 'auto',
+                          marginTop: 'auto'
+                        })
+                      "
+                    >
+                      <!-- Empty state -->
+                      <template v-if="messages.length === 0">
+                        <MpIcon name="airene-brand" size="2.5rem" />
 
-                      <MpText size="body" color="gray.900" :class="css({ display: 'block', marginTop: '5' })">
-                        Hello, {{ accountInformation.fullName }}
-                      </MpText>
+                        <MpText
+                          size="body"
+                          color="gray.900"
+                          :class="css({ display: 'block', marginTop: '5' })"
+                        >
+                          Hello, {{ accountInformation.fullName }}
+                        </MpText>
 
-                      <MpText size="body" color="gray.700" :class="css({ display: 'block', marginTop: '3' })">
-                        I am Airene, an AI assistant that will help you find answers on reports, sales,
-                        purchases, products, stocks, and tutorials about Jurnal features.
-                      </MpText>
+                        <MpText
+                          size="body"
+                          color="gray.700"
+                          :class="css({ display: 'block', marginTop: '3' })"
+                        >
+                          I am Airene, an AI assistant that will help you find answers on reports,
+                          sales, purchases, products, stocks, and tutorials about Jurnal features.
+                        </MpText>
 
-                      <MpText size="overline" color="gray.500" :class="css({ display: 'block', marginTop: '6', marginBottom: '3', textTransform: 'uppercase' })">
-                        Question examples
-                      </MpText>
+                        <MpText
+                          size="overline"
+                          color="gray.500"
+                          :class="
+                            css({
+                              display: 'block',
+                              marginTop: '6',
+                              marginBottom: '3',
+                              textTransform: 'uppercase'
+                            })
+                          "
+                        >
+                          Question examples
+                        </MpText>
 
-                      <Pixel.div :class="css({ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3' })">
-                        <Pixel.button v-for="q in questions" :key="q" :class="questionPillClass" @click="send(q)">
-                          <MpText size="body" color="blue.400">{{ q }}</MpText>
-                        </Pixel.button>
-                      </Pixel.div>
-                    </template>
+                        <Pixel.div
+                          :class="
+                            css({
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'flex-start',
+                              gap: '3'
+                            })
+                          "
+                        >
+                          <Pixel.button
+                            v-for="q in questions"
+                            :key="q"
+                            :class="questionPillClass"
+                            @click="send(q)"
+                          >
+                            <MpText size="body" color="blue.400">{{ q }}</MpText>
+                          </Pixel.button>
+                        </Pixel.div>
+                      </template>
 
-                    <!-- Conversation -->
-                    <template v-else>
-                      <MpText size="label" color="gray.500" :class="css({ display: 'block', textAlign: 'center', marginTop: '6', marginBottom: '6', fontSize: 'sm' })">
-                        {{ dateLabel }}
-                      </MpText>
+                      <!-- Conversation -->
+                      <template v-else>
+                        <MpText
+                          size="label"
+                          color="gray.500"
+                          :class="
+                            css({
+                              display: 'block',
+                              textAlign: 'center',
+                              marginTop: '6',
+                              marginBottom: '6',
+                              fontSize: 'sm'
+                            })
+                          "
+                        >
+                          {{ dateLabel }}
+                        </MpText>
 
-                      <Pixel.div :class="css({ display: 'flex', flexDirection: 'column', gap: '6' })">
-                        <template v-for="msg in messages" :key="msg.id">
-                          <!-- User message (right) -->
-                          <Pixel.div v-if="msg.role === 'user'">
-                            <Pixel.div :class="css({ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '2', marginBottom: '2' })">
-                              <MpText size="body" color="gray.900" :class="css({ fontWeight: 'semiBold' })">You</MpText>
-                              <MpIcon name="profile" size="md" color="gray.700" />
-                            </Pixel.div>
-                            <MpText size="body" color="gray.900" :class="css({ display: 'block', textAlign: 'right' })">{{ msg.text }}</MpText>
-                          </Pixel.div>
-
-                          <!-- Airene message (left) -->
-                          <Pixel.div v-else>
-                            <Pixel.div :class="css({ display: 'flex', alignItems: 'center', gap: '2', marginBottom: '2' })">
-                              <MpIcon name="airene-brand" size="md" />
-                              <MpText size="body" color="gray.900" :class="css({ fontWeight: 'semiBold' })">Airene</MpText>
-                            </Pixel.div>
-
-                            <Transition name="airene-reveal" appear>
-                              <!-- Answer -->
-                              <Pixel.div key="answer">
-                                <!-- Reasoning (plain, collapsible) -->
-                                <Pixel.div :class="css({ marginBottom: '3' })">
-                                  <Pixel.button :class="reasoningToggleClass" :aria-expanded="msg.showReasoning" @click="msg.showReasoning = !msg.showReasoning">
-                                    <MpText size="label" color="text.secondary" :class="css({ fontSize: 'sm' })">Reasoning</MpText>
-                                  </Pixel.button>
-                                  <Pixel.div v-if="msg.showReasoning" :class="css({ marginTop: '2', display: 'flex', flexDirection: 'column', gap: '1' })">
-                                    <MpText v-for="(step, i) in msg.answer.reasoning" :key="i" size="label" color="text.secondary" :class="css({ display: 'block', fontSize: 'sm' })">{{ i + 1 }}. {{ step }}</MpText>
-                                  </Pixel.div>
-                                </Pixel.div>
-
-                                <Pixel.div :class="bubbleClass">
-                                  <MpText size="body" color="gray.900" :class="css({ display: 'block', fontWeight: 'bold', fontSize: 'lg', marginBottom: '2' })">{{ msg.answer.title }}</MpText>
-                                  <MpText size="body" color="gray.900" :class="css({ display: 'block' })">{{ msg.answer.intro }}</MpText>
-
-                                  <Pixel.div v-if="msg.answer.list?.length" :class="css({ marginTop: '1' })">
-                                    <MpText v-for="(item, i) in msg.answer.list" :key="i" size="body" color="gray.900" :class="css({ display: 'block' })">{{ i + 1 }}. {{ item }}</MpText>
-                                  </Pixel.div>
-
-                                  <MpText v-if="msg.answer.outro" size="body" color="gray.900" :class="css({ display: 'block', marginTop: '1' })">
-                                    {{ msg.answer.outro }}
-                                    <template v-for="(lnk, i) in msg.answer.links || []" :key="i"
-                                      ><MpText as="a" size="body" color="blue.400" :href="lnk.url" target="_blank" rel="noopener">{{ lnk.label }}</MpText
-                                      ><template v-if="i < (msg.answer.links?.length || 0) - 1">, </template></template>
-                                  </MpText>
-                                </Pixel.div>
-
-                                <!-- Actions -->
-                                <Pixel.div :class="css({ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '3' })">
-                                  <Pixel.button :class="sidebarLinkClass" aria-label="Copy response">
-                                    <MpIcon name="copy" size="sm" color="blue.400" />
-                                    <MpText size="body" color="blue.400" :class="css({ fontWeight: 'medium' })">Copy response</MpText>
-                                  </Pixel.button>
-                                  <Pixel.div :class="css({ display: 'flex', alignItems: 'center', gap: '3' })">
-                                    <Pixel.button aria-label="Good response" :class="css({ cursor: 'pointer', display: 'flex' })">
-                                      <MpIcon name="like" size="sm" color="gray.500" />
-                                    </Pixel.button>
-                                    <Pixel.button aria-label="Bad response" :class="css({ cursor: 'pointer', display: 'flex' })">
-                                      <MpIcon name="dislike" size="sm" color="gray.500" />
-                                    </Pixel.button>
-                                  </Pixel.div>
-                                </Pixel.div>
+                        <Pixel.div
+                          :class="css({ display: 'flex', flexDirection: 'column', gap: '6' })"
+                        >
+                          <template v-for="msg in messages" :key="msg.id">
+                            <!-- User message (right) -->
+                            <Pixel.div v-if="msg.role === 'user'">
+                              <Pixel.div
+                                :class="
+                                  css({
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'flex-end',
+                                    gap: '2',
+                                    marginBottom: '2'
+                                  })
+                                "
+                              >
+                                <MpText
+                                  size="body"
+                                  color="gray.900"
+                                  :class="css({ fontWeight: 'semiBold' })"
+                                  >You</MpText
+                                >
+                                <MpIcon name="profile" size="md" color="gray.700" />
                               </Pixel.div>
-                            </Transition>
-                          </Pixel.div>
-                        </template>
-                      </Pixel.div>
-                    </template>
+                              <MpText
+                                size="body"
+                                color="gray.900"
+                                :class="css({ display: 'block', textAlign: 'right' })"
+                                >{{ msg.text }}</MpText
+                              >
+                            </Pixel.div>
+
+                            <!-- Airene message (left) -->
+                            <Pixel.div v-else>
+                              <Pixel.div
+                                :class="
+                                  css({
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '2',
+                                    marginBottom: '2'
+                                  })
+                                "
+                              >
+                                <MpIcon name="airene-brand" size="md" />
+                                <MpText
+                                  size="body"
+                                  color="gray.900"
+                                  :class="css({ fontWeight: 'semiBold' })"
+                                  >Airene</MpText
+                                >
+                              </Pixel.div>
+
+                              <Transition name="airene-reveal" appear>
+                                <!-- Answer -->
+                                <Pixel.div key="answer">
+                                  <!-- Reasoning (plain, collapsible) -->
+                                  <Pixel.div :class="css({ marginBottom: '3' })">
+                                    <Pixel.button
+                                      :class="reasoningToggleClass"
+                                      :aria-expanded="msg.showReasoning"
+                                      @click="msg.showReasoning = !msg.showReasoning"
+                                    >
+                                      <MpText
+                                        size="label"
+                                        color="text.secondary"
+                                        :class="css({ fontSize: 'sm' })"
+                                        >Reasoning</MpText
+                                      >
+                                    </Pixel.button>
+                                    <Pixel.div
+                                      v-if="msg.showReasoning"
+                                      :class="
+                                        css({
+                                          marginTop: '2',
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: '1'
+                                        })
+                                      "
+                                    >
+                                      <MpText
+                                        v-for="(step, i) in msg.answer.reasoning"
+                                        :key="i"
+                                        size="label"
+                                        color="text.secondary"
+                                        :class="css({ display: 'block', fontSize: 'sm' })"
+                                        >{{ i + 1 }}. {{ step }}</MpText
+                                      >
+                                    </Pixel.div>
+                                  </Pixel.div>
+
+                                  <Pixel.div :class="bubbleClass">
+                                    <MpText
+                                      size="body"
+                                      color="gray.900"
+                                      :class="
+                                        css({
+                                          display: 'block',
+                                          fontWeight: 'bold',
+                                          fontSize: 'lg',
+                                          marginBottom: '2'
+                                        })
+                                      "
+                                      >{{ msg.answer.title }}</MpText
+                                    >
+                                    <MpText
+                                      size="body"
+                                      color="gray.900"
+                                      :class="css({ display: 'block' })"
+                                      >{{ msg.answer.intro }}</MpText
+                                    >
+
+                                    <Pixel.div
+                                      v-if="msg.answer.list?.length"
+                                      :class="css({ marginTop: '1' })"
+                                    >
+                                      <MpText
+                                        v-for="(item, i) in msg.answer.list"
+                                        :key="i"
+                                        size="body"
+                                        color="gray.900"
+                                        :class="css({ display: 'block' })"
+                                        >{{ i + 1 }}. {{ item }}</MpText
+                                      >
+                                    </Pixel.div>
+
+                                    <MpText
+                                      v-if="msg.answer.outro"
+                                      size="body"
+                                      color="gray.900"
+                                      :class="css({ display: 'block', marginTop: '1' })"
+                                    >
+                                      {{ msg.answer.outro }}
+                                      <template v-for="(lnk, i) in msg.answer.links || []" :key="i"
+                                        ><MpText
+                                          as="a"
+                                          size="body"
+                                          color="blue.400"
+                                          :href="lnk.url"
+                                          target="_blank"
+                                          rel="noopener"
+                                          >{{ lnk.label }}</MpText
+                                        ><template v-if="i < (msg.answer.links?.length || 0) - 1"
+                                          >,
+                                        </template></template
+                                      >
+                                    </MpText>
+                                  </Pixel.div>
+
+                                  <!-- Actions -->
+                                  <Pixel.div
+                                    :class="
+                                      css({
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        marginTop: '3'
+                                      })
+                                    "
+                                  >
+                                    <Pixel.button
+                                      :class="sidebarLinkClass"
+                                      aria-label="Copy response"
+                                    >
+                                      <MpIcon name="copy" size="sm" color="blue.400" />
+                                      <MpText
+                                        size="body"
+                                        color="blue.400"
+                                        :class="css({ fontWeight: 'medium' })"
+                                        >Copy response</MpText
+                                      >
+                                    </Pixel.button>
+                                    <Pixel.div
+                                      :class="
+                                        css({ display: 'flex', alignItems: 'center', gap: '3' })
+                                      "
+                                    >
+                                      <Pixel.button
+                                        aria-label="Good response"
+                                        :class="css({ cursor: 'pointer', display: 'flex' })"
+                                      >
+                                        <MpIcon name="like" size="sm" color="gray.500" />
+                                      </Pixel.button>
+                                      <Pixel.button
+                                        aria-label="Bad response"
+                                        :class="css({ cursor: 'pointer', display: 'flex' })"
+                                      >
+                                        <MpIcon name="dislike" size="sm" color="gray.500" />
+                                      </Pixel.button>
+                                    </Pixel.div>
+                                  </Pixel.div>
+                                </Pixel.div>
+                              </Transition>
+                            </Pixel.div>
+                          </template>
+                        </Pixel.div>
+                      </template>
+                    </Pixel.div>
                   </Pixel.div>
-                </Pixel.div>
 
                   <!-- Jump to bottom -->
                   <Transition name="airene-jump">
-                    <Pixel.button v-if="messages.length && !atBottom" :class="jumpBtnClass" @click="scrollToBottom(true)">
+                    <Pixel.button
+                      v-if="messages.length && !atBottom"
+                      :class="jumpBtnClass"
+                      @click="scrollToBottom(true)"
+                    >
                       <MpIcon name="arrows-down" size="sm" color="gray.700" />
-                      <MpText size="label" color="gray.700" :class="css({ fontSize: 'sm' })">Jump to bottom</MpText>
+                      <MpText size="label" color="gray.700" :class="css({ fontSize: 'sm' })"
+                        >Jump to bottom</MpText
+                      >
                     </Pixel.button>
                   </Transition>
                 </Pixel.div>
 
                 <!-- Input (pinned) -->
-                <Pixel.div :class="css({ width: 'full', maxWidth: '600px', marginX: 'auto', paddingBottom: '3' })">
+                <Pixel.div
+                  :class="
+                    css({ width: 'full', maxWidth: '600px', marginX: 'auto', paddingBottom: '3' })
+                  "
+                >
                   <Pixel.div :class="[inputBarClass, 'airene-input-bar']">
                     <MpIcon name="text-editor-list" size="md" color="gray.500" />
                     <MpInput
@@ -179,12 +443,28 @@
                       aria-label="Ask Airene"
                       @keydown.enter="send(query)"
                     />
-                    <MpButton variant="primary" is-rounded left-icon="arrows-up" aria-label="Send" @click="send(query)" />
+                    <MpButton
+                      variant="primary"
+                      is-rounded
+                      left-icon="arrows-up"
+                      aria-label="Send"
+                      @click="send(query)"
+                    />
                   </Pixel.div>
 
-                  <MpText size="label" color="gray.500" :class="css({ display: 'block', marginTop: '3', fontSize: 'sm' })">
+                  <MpText
+                    size="label"
+                    color="gray.500"
+                    :class="css({ display: 'block', marginTop: '3', fontSize: 'sm' })"
+                  >
                     Airene responses can be inaccurate or misleading.
-                    <MpText as="span" size="label" color="blue.400" :class="css({ fontWeight: 'medium', fontSize: 'sm' })">Learn more</MpText>
+                    <MpText
+                      as="span"
+                      size="label"
+                      color="blue.400"
+                      :class="css({ fontWeight: 'medium', fontSize: 'sm' })"
+                      >Learn more</MpText
+                    >
                   </MpText>
                 </Pixel.div>
               </Pixel.div>
